@@ -5,6 +5,19 @@ Um jogo 2D de temática pirata desenvolvido com foco em alta performance, combin
 O projeto foi estruturado de forma modular para isolar a física e a renderização gráfica da camada de interface de usuário (HUD e menus).
 
 ---
+🗺️ Próximas Etapas & Roadmap
+[ ] Persistência de ranking com LocalStorage ou backend simples.
+[ ] Match History
+[ ] Menu Options funcional
+[ ] Telas de Gameover e Pause
+[ ] Novos tipos de inimigos (Chaser / Boss).
+[ ] Editor de Mapas com UI
+[ ] Efeitos sonoros e trilha sonora pirata customizada.
+[ ] Power-ups espalhados pelo mapa (reparação de casco e tiro triplo).
+[ ] Boss
+[ ] Animações
+
+---
 
 ## 🚀 Funcionalidades e Recursos Implementados
 
@@ -14,7 +27,7 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
 * **Mapeamento de Sprites:** Utilização de *Tilesheets* e *Spritesheets* para otimização gráfica.
 * **Sistema de Movimentação e Física:** Controle fluido do navio do jogador com tratamento de colisões.
 * **Inteligência Artificial (IA) de Inimigos:** 
-  * Modo *Chaser* (perseguição ao jogador).
+  * Modo *Shooter* (perseguição ao jogador e atirador).
   * Comportamento de fuga/desvio de ilhas para evitar colisões estáticas.
 * **Sistema de Combate:** Mecânica de disparos frontais e controle de dano/vida para o jogador e embarcações inimigas.
 * **Gerenciador de Spawn:** Sistema dinâmico configurável para controle de taxa de surgimento (*respawn rate*) e limite máximo de inimigos simultâneos.
@@ -44,4 +57,12 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
 Siga os passos abaixo para rodar o projeto na sua máquina:
 
 1. **Clone o repositório:**
-2. **Execute npm run dev**
+2. Instale as dependências e execute:
+
+Bash
+npm install
+Inicie o servidor de desenvolvimento:
+
+Bash
+npm run dev
+Acesse no navegador através do endereço fornecido pelo Vite (geralmente http://localhost:5173).
