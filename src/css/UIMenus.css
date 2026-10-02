@@ -1,0 +1,43 @@
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(100, 40, 40, 0.75);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+  }
+  
+  .logo {
+    width: 400px;
+    margin-bottom: 40px;
+  }
+  
+  .buttonContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 220px;
+  }
+  
+  .primaryButton {
+    padding: 12px 20px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+    background-color: #2c3e50;
+    border: 2px solid #f1c40f;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: 0.2s;
+  }
+  
+  .primaryButton:hover {
+    background-color: #34495e;
+    border-color: #f39c12;
+  }

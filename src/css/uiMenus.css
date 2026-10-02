@@ -1,0 +1,141 @@
+h1, h2 {
+  color: #fff;
+  font-family: sans-serif;
+  margin-bottom: 30px;
+  margin-top: -20px;
+}
+
+h1 {
+  font-size: 22pt;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(100, 40, 40, 0.75);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.logo {
+  display: inline-block;
+  width: 400px;
+  margin-top: -30px;
+  margin-bottom: 20px;
+}
+
+.containerMenu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 100px;
+  min-width: 500px;
+  background-image: url('/assets/ui/panel_menu.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.containerMenuBig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 100px;
+  min-width: 700px;
+  background-image: url('/assets/ui/panel_menu_big.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.buttonContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;          /* Garante que os botões fiquem alinhados ao centro do container */
+  gap: 15px;
+  width: 100%;                  /* Ocupa a largura disponível para alinhar no meio */
+}
+
+.primaryButton {
+  padding: 12px 20px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #080808;
+  text-transform: uppercase;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: 0.2s;
+  width: 200px;
+  background-image: url('/assets/ui/buttons/button_primary_normal.png');
+  background-position: center;
+  background-size: cover;
+  background-color: transparent;
+  border: 0px;
+}
+
+.primaryButton:hover {
+  background-image: url('../../public/assets/ui/buttons/button_primary_hover.png');
+}
+
+.formGroup { 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 7px; 
+}
+
+.label { 
+  margin-bottom: 5px; 
+  font-size: 14px;
+  font-family: sans-serif;
+  color: #fff;
+}
+
+.inputTextClass { 
+  padding: 8px; 
+  border-radius: 4px; 
+  border: 0px; 
+  border-radius: 7px;
+  height: 25px;
+  font-size: 12pt;
+  text-align: center;
+}
+
+
+.listaInputs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.containerTable {
+  display: block;
+  float: left;
+  width: 100%;
+}
+
+.tableRanking {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.tableRanking th {
+  font-weight: bold;
+  font-size: 10pt;
+  text-align: left;
+  padding: 10px;
+}
+
+.tableRanking td {
+  padding: 17px;
+  border: 0px;
+  background-color: #162633;
+}
