@@ -6,6 +6,7 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
 
 ---
 ### 🗺️ Próximas Etapas & Roadmap
+* [ ] Ajustes para Responsividade
 * [ ] Persistência de ranking com LocalStorage ou backend simples.
 * [ ] Match History
 * [ ] Menu Options funcional
@@ -16,6 +17,7 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
 * [ ] Power-ups espalhados pelo mapa (reparação de casco e tiro triplo).
 * [ ] Boss
 * [ ] Animações
+* [ ] Testes com Playwright
 
 ---
 
