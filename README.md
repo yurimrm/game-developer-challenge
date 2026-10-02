@@ -1,32 +1,47 @@
-# React + TypeScript + Vite
+# 🏴‍☠️ Pirate Battle - PixiJS + React Game
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Um jogo 2D de temática pirata desenvolvido com foco em alta performance, combinando um motor gráfico robusto baseado em **PixiJS** para o loop de jogo (60 FPS) e **React + Zustand** para o gerenciamento da interface e menus.
 
-Currently, two official plugins are available:
+O projeto foi estruturado de forma modular para isolar a física e a renderização gráfica da camada de interface de usuário (HUD e menus).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🚀 Funcionalidades e Recursos Implementados
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 🎮 Motor de Jogo & Física (`PixiJS` / `Core`)
+* **Estrutura Modular:** Separação clara entre a lógica do motor (`src/core/`) e a interface (`src/ui/`).
+* **Geração Procedural de Mapa:** Sistema de mundos baseados em *Seed* para distribuição consistente de ilhas e elementos.
+* **Mapeamento de Sprites:** Utilização de *Tilesheets* e *Spritesheets* para otimização gráfica.
+* **Sistema de Movimentação e Física:** Controle fluido do navio do jogador com tratamento de colisões.
+* **Inteligência Artificial (IA) de Inimigos:** 
+  * Modo *Chaser* (perseguição ao jogador).
+  * Comportamento de fuga/desvio de ilhas para evitar colisões estáticas.
+* **Sistema de Combate:** Mecânica de disparos frontais e controle de dano/vida para o jogador e embarcações inimigas.
+* **Gerenciador de Spawn:** Sistema dinâmico configurável para controle de taxa de surgimento (*respawn rate*) e limite máximo de inimigos simultâneos.
 
-## Expanding the Oxlint configuration
+### 🖥️ Interface & Menus (`React` + `Zustand`)
+* **Gerenciamento de Estado Global:** Utilização do Zustand para controle fluído de telas, modais e opções.
+* **Menu Principal:** Tela com logotipo temático e navegação rápida para Play, Options e Ranking.
+* **Tela de Configurações (Options):** Ajustes dinâmicos para tempo total de partida, limite de inimigos e taxa de spawn.
+* **Hall da Fama (Ranking):** Tabela de pontuações exibindo posição, nome do capitão, tempo de sobrevivência e inimigos derrotados.
+* **Menu de Pause & Game Over:** Atalhos de controle de fluxo de jogo (*Resume*, *Ranking*, *Main Menu*).
+* **HUD Dinâmica:** Interface sobreposta otimizada para exibição de tempo restante e pontuação sem comprometer a performance do motor gráfico.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+---
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+## 🛠️ Tecnologias Utilizadas
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+* **[Vite](https://vitejs.dev/)** - Empacotador e ambiente de desenvolvimento ultrarrápido.
+* **[React](https://react.dev/)** - Construção de componentes de interface e menus.
+* **[TypeScript](https://www.typescriptlang.org/)** - Tipagem estática para maior segurança e escalabilidade.
+* **[PixiJS](https://pixijs.com/)** - Motor gráfico 2D de alta performance renderizado via WebGL.
+* **[Zustand](https://github.com/pmndrs/zustand)** - Gerenciamento de estado leve e eficiente.
+
+---
+
+## ⚙️ Como Executar o Projeto Localmente
+
+Siga os passos abaixo para rodar o projeto na sua máquina:
+
+1. **Clone o repositório:**
+2. **Execute npm run dev**
