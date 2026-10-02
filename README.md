@@ -72,5 +72,5 @@ npm run dev
 4. Acesse no navegador através do endereço fornecido pelo Vite, geralmente em:
    
 ```
-http://localhost:5173).
+http://localhost:5173
 ```
