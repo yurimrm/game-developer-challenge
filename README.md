@@ -5,17 +5,17 @@ Um jogo 2D de temática pirata desenvolvido com foco em alta performance, combin
 O projeto foi estruturado de forma modular para isolar a física e a renderização gráfica da camada de interface de usuário (HUD e menus).
 
 ---
-🗺️ Próximas Etapas & Roadmap
-[ ] Persistência de ranking com LocalStorage ou backend simples.
-[ ] Match History
-[ ] Menu Options funcional
-[ ] Telas de Gameover e Pause
-[ ] Novos tipos de inimigos (Chaser / Boss).
-[ ] Editor de Mapas com UI
-[ ] Efeitos sonoros e trilha sonora pirata customizada.
-[ ] Power-ups espalhados pelo mapa (reparação de casco e tiro triplo).
-[ ] Boss
-[ ] Animações
+### 🗺️ Próximas Etapas & Roadmap
+* [ ] Persistência de ranking com LocalStorage ou backend simples.
+* [ ] Match History
+* [ ] Menu Options funcional
+* [ ] Telas de Gameover e Pause
+* [ ] Novos tipos de inimigos (Chaser / Boss).
+* [ ] Editor de Mapas com UI
+* [ ] Efeitos sonoros e trilha sonora pirata customizada.
+* [ ] Power-ups espalhados pelo mapa (reparação de casco e tiro triplo).
+* [ ] Boss
+* [ ] Animações
 
 ---
 
@@ -59,10 +59,18 @@ Siga os passos abaixo para rodar o projeto na sua máquina:
 1. **Clone o repositório:**
 2. Instale as dependências e execute:
 
+```
 Bash
 npm install
-Inicie o servidor de desenvolvimento:
+```
+3. Inicie o servidor de desenvolvimento:
 
+```
 Bash
 npm run dev
-Acesse no navegador através do endereço fornecido pelo Vite (geralmente http://localhost:5173).
+```
+4. Acesse no navegador através do endereço fornecido pelo Vite, geralmente em:
+   
+```
+http://localhost:5173).
+```
