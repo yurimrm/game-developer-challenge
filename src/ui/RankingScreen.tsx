@@ -21,9 +21,8 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ isGameOver }) => {
   return (
     <div className="overlay">
       <div className="containerMenuBig">
-        {isGameOver && <h1>GAME OVER</h1>}
-        <h2>CAPITAIN'S LOG</h2>
 
+        <h2>{isGameOver && <span>GAME OVER</span>} | CAPITAIN'S LOG</h2>
         {isGameOver && (
           <p className='gameOvertext'>Sua pontuação nessa partida foi: <strong>{currentScore} pontos</strong></p>
         )}
@@ -35,7 +34,7 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ isGameOver }) => {
           - Se aberto do pause: exibe somente o botão "Voltar" (para retornar ao pause).
           - Se aberto do menu principal: exibe somente o botão "Voltar ao Menu".
         */}
-        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+        <div style={{ marginTop: '10px', textAlign: 'center' }}>
           {openedFromPause ? (
             <button className="primaryButton" onClick={handleBack}>Back</button>
           ) : (
