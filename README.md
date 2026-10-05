@@ -6,7 +6,6 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
 
 ---
 ### 🗺️ Próximas Etapas & Roadmap
-* [ ] Testes com Playwright
 * [ ] Editor de Mapas com UI
 * [ ] Efeitos sonoros e trilha sonora pirata customizada.
 * [ ] Power-ups espalhados pelo mapa (reparação de casco e tiro triplo).
@@ -16,6 +15,8 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
 ---
 
 ## 🚀 Funcionalidades e Recursos Implementados
+* [x] Estruturar API de MOCK com o Axios
+* [x] Estruturar Testes com Playwright
 * [x] Ajustes para Responsividade
 * [x] Persistência de ranking com LocalStorage ou backend simples.
 * [x] Match History
