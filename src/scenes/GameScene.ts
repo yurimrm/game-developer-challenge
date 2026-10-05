@@ -1,21 +1,18 @@
 // src/scenes/GameScene.ts
-import { Application, Container, Text, Sprite, Assets, Texture, Graphics } from 'pixi.js';
-
+import { Application, Container, Text, Assets, Texture } from 'pixi.js';
 import { Ship } from '../core/Ship';
-import { SeedRandom } from '../core/SeedRandom';
 import { TileHelper } from '../core/TileHelper';
-import { TILE_COORDS } from '../core/TileMapConfig';
 import { AssetManager } from '../core/AssetManager';
-import { XMLAtlasLoader } from '../core/XMLAtlasLoader';
+import { MapGenerator } from '../core/MapGenerator';
+import { CombatManager, CannonBall } from '../managers/CombatManager';
+import { EnemyManager, EnemyData } from '../managers/EnemyManager';
+import { GameHud } from '../ui/GameHud';
 import { useGameStore } from '../ui/GameStore';
-
 import { pirateApi } from '../service/apiService';
 
 export class GameScene {
-  
   private isPaused: boolean = false;
-  private isGameOver: boolean = false;
-  private isGameOverTriggered: boolean = false; // Trava de salvamento único
+  private isGameOverTriggered: boolean = false;
   
   private app: Application;
   private worldContainer: Container;
@@ -24,67 +21,39 @@ export class GameScene {
   private infoText?: Text;
   private isAssetsLoaded: boolean = false;
 
-  // Propriedades do mapa e combate
   private tileSize: number = 64;
   private radiusInTiles: number = 30;
   private currentGrid: ('deep' | 'shallow' | 'land')[][] = [];
   private mapOriginTileX: number = 0;
   private mapOriginTileY: number = 0;
 
-  // Limites dinâmicos reais do mapa gerado
   private mapMinX: number = 0;
   private mapMaxX: number = 4000;
   private mapMinY: number = 0;
   private mapMaxY: number = 4000;
 
-  // Vida do Jogador
   private playerMaxHp: number = 100;
   private playerHp: number = 100;
-  private playerHealthContainer!: Container;
-  private playerHealthBarFill!: Sprite;
-  private playerHealthMask!: Graphics;
+  private playerHealthBarFill!: any;
+  private playerHealthMask!: any;
   private playerMaxInternalWidth: number = 165;
   private playerHealthText!: Text;
 
-  // Sistema de Jogo (Pontuação e Tempo)
+  private lastShotTime: number = 0;
+  private shootCooldown: number = 300; // Milissegundos entre cada tiro (ajuste se quiser mais lento/rápido)
+
   private score: number = 0;
   private remainingTime: number = useGameStore.getState().matchDuration; 
   private maxAllowedEnemies: number = useGameStore.getState().maxEnemies; 
   private timeElapsedAccumulator: number = 0; 
   private scoreText!: Text;
   private timerText!: Text;
-  private statsContainer!: Container;
-  
-  // Lista de projéteis ativos
-  private cannonBalls: { 
-    sprite: Sprite; 
-    vx: number; 
-    vy: number; 
-    distanceTraveled: number; 
-    landTilesPenetrated: number;
-    hasExploded: boolean;
-    lastLandTileKey: string;
-    isEnemyShot?: boolean;
-  }[] = [];
 
-  private enemies: {
-    ship: Ship;
-    type: 'shooter' | 'kamikaze';
-    state: 'wandering' | 'attacking' | 'chasing' | 'escaping' | 'kamikaze';
-    shootTimer: number;
-    wanderAngle: number;
-    escapeTimer: number;
-    maxHp: number;
-    hp: number;
-    maxInternalWidth: number;
-    healthContainer: Container;
-    healthBarFill: Sprite;
-    avoidanceDirection?: number; 
-  }[] = [];
+  private cannonBalls: CannonBall[] = [];
+  private enemies: EnemyData[] = [];
 
   constructor(app: Application) {
     this.app = app;
-    
     this.worldContainer = new Container();
     this.worldContainer.sortableChildren = true;
     this.app.stage.addChild(this.worldContainer);
@@ -94,24 +63,15 @@ export class GameScene {
 
   public setPaused(paused: boolean) {
     this.isPaused = paused;
-    if (paused) {
-      this.playSound('game_pause.wav');
-    } else {
-      this.playSound('game_resume.wav');
-    }
+    this.playSound(paused ? 'game_pause.wav' : 'game_resume.wav');
   }
 
-  // --- FUNÇÃO AUXILIAR DE ÁUDIO ---
   private playSound(filename: string, volume: number = 0.5) {
     try {
       const audio = new Audio(`/assets/sounds/${filename}`);
       audio.volume = volume;
-      audio.play().catch(() => {
-        // Ignora restrições de autoplay do browser antes da primeira interação
-      });
-    } catch (e) {
-      // Falha silenciosa
-    }
+      audio.play().catch(() => {});
+    } catch (e) {}
   }
 
   private async init() {
@@ -119,9 +79,7 @@ export class GameScene {
       this.isGameOverTriggered = false;
 
       await AssetManager.getInstance().loadGameAssets();
-
-      const tileSheetTexture = Assets.get('/assets/tilesheet/tiles_sheet.png');
-      TileHelper.init(tileSheetTexture);
+      TileHelper.init(Assets.get('/assets/tilesheet/tiles_sheet.png'));
       this.isAssetsLoaded = true;
 
       this.myShip = new Ship('blue', 0);
@@ -129,19 +87,34 @@ export class GameScene {
       this.myShip.y = 1000; 
       this.myShip.zIndex = 10;
 
-      this.generateTestMap();
+      const mapRes = MapGenerator.generate(this.worldContainer, this.myShip.x, this.myShip.y, this.tileSize, this.radiusInTiles);
+      this.currentGrid = mapRes.currentGrid;
+      this.mapOriginTileX = mapRes.mapOriginTileX;
+      this.mapOriginTileY = mapRes.mapOriginTileY;
+      this.mapMinX = mapRes.mapMinX;
+      this.mapMaxX = mapRes.mapMaxX;
+      this.mapMinY = mapRes.mapMinY;
+      this.mapMaxY = mapRes.mapMaxY;
+
       this.spawnEnemies(); 
 
       this.worldContainer.addChild(this.myShip);
 
-      this.createPlayerHUD();
-      this.createStatsHUD();
+      const pHud = GameHud.createPlayerHUD(this.app, this.playerHp, this.playerMaxHp);
+      this.playerHealthBarFill = pHud.healthBarFill;
+      this.playerHealthMask = pHud.healthMask;
+      this.playerHealthText = pHud.healthText;
+      this.playerMaxInternalWidth = pHud.maxInternalWidth;
+
+      const sHud = GameHud.createStatsHUD(this.app);
+      this.scoreText = sHud.scoreText;
+      this.timerText = sHud.timerText;
 
       this.playSound('game_start.wav', 0.6);
 
       this.infoText = new Text({
         text: 'Carregando dados de depuração...',
-        style: { fill: '#000', fontSize: 14, align: 'left' }
+        style: { fill: '#ffffff', fontSize: 14, align: 'left' }
       });
       this.infoText.x = 20;
       this.infoText.y = 80; 
@@ -152,31 +125,19 @@ export class GameScene {
 
       const screenCenterX = (this.app.screen.width / this.app.stage.scale.x) / 2;
       const screenCenterY = (this.app.screen.height / this.app.stage.scale.y) / 2;
-
       this.worldContainer.x = screenCenterX - this.myShip.x;
       this.worldContainer.y = screenCenterY - this.myShip.y;
 
-      const handleGameOverSubmission = async (playerName:string, score:number, timeSurvived:any, enemiesDefeated:number) => {
+      const handleGameOverSubmission = async (playerName: string, score: number, timeSurvived: any, enemiesDefeated: number) => {
         try {
           const token = await pirateApi.login(playerName);
-          await pirateApi.saveMatchRecord({
-            playerName,
-            score,
-            timeSurvived,
-            enemiesDefeated
-          }, token);
-
-          console.log("Dados sincronizados com o backend com sucesso!");
-        } catch (err) {
-          console.error("Erro na comunicação com o backend:", err);
-        }
+          await pirateApi.saveMatchRecord({ playerName, score, timeSurvived, enemiesDefeated }, token);
+        } catch (err) {}
       };
 
       this.app.ticker.add((ticker) => {
-        
         if (this.isPaused) return;
 
-        // --- CONDIÇÃO DE GAME OVER ---
         if ((this.playerHp <= 0 || this.remainingTime <= 0) && !this.isGameOverTriggered) {
           this.isGameOverTriggered = true;
           this.playSound('game_over.wav', 0.7);
@@ -184,71 +145,38 @@ export class GameScene {
           const { playerName, matchDuration } = useGameStore.getState();
           const timeLeft = this.remainingTime;
           const timeSpentSeconds = matchDuration - timeLeft;
-          
-          const mins = Math.floor(timeSpentSeconds / 60);
-          const secs = timeSpentSeconds % 60;
-          const timeFormatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+          const timeFormatted = `${String(Math.floor(timeSpentSeconds / 60)).padStart(2, '0')}:${String(timeSpentSeconds % 60).padStart(2, '0')}`;
 
-          useGameStore.getState().addMatchRecord({
-            playerName: playerName,
-            score: this.score,
-            timeSurvived: timeFormatted,
-            enemiesDefeated: this.score, 
-          });
-
+          useGameStore.getState().addMatchRecord({ playerName, score: this.score, timeSurvived: timeFormatted, enemiesDefeated: this.score });
           handleGameOverSubmission(playerName, this.score, timeFormatted, this.score);
-
           useGameStore.getState().addRanking(playerName, this.score);
           useGameStore.getState().setCurrentGameStats(this.score, timeLeft);
           useGameStore.getState().setScreen('game_over');
-          
           return;
         }
 
         if (this.isGameOverTriggered) return;
-
         const delta = ticker.deltaTime;
 
-        // --- ATUALIZAÇÃO DO CRONÔMETRO ---
         if (this.remainingTime > 0) {
           this.timeElapsedAccumulator += ticker.deltaMS;
           if (this.timeElapsedAccumulator >= 1000) {
             this.remainingTime -= 1;
             this.timeElapsedAccumulator -= 1000;
           }
-
-          const minutes = Math.floor(this.remainingTime / 60);
-          const seconds = this.remainingTime % 60;
-          const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-          
           if (this.timerText) {
-            this.timerText.text = `${formattedTime}`;
-          }
-        } else {
-          if (this.timerText) {
-            this.timerText.text = `Tempo Esgotado!`;
+            this.timerText.text = `${String(Math.floor(this.remainingTime / 60)).padStart(2, '0')}:${String(this.remainingTime % 60).padStart(2, '0')}`;
           }
         }
 
-        // --- RESPAWN DE INIMIGOS ---
-        if (this.enemies.length < this.maxAllowedEnemies) {
-          if (Math.random() < 0.02) { 
-            this.spawnSingleEnemy();
-          }
+        if (this.enemies.length < this.maxAllowedEnemies && Math.random() < 0.02) {
+          this.spawnSingleEnemy();
         }
 
-        if (this.keysPressed['ArrowUp'] || this.keysPressed['KeyW']) {
-          this.myShip.accelerate(0.05 * delta);
-        }
-        if (this.keysPressed['ArrowDown'] || this.keysPressed['KeyS']) {
-          this.myShip.accelerate(-0.05 * delta);
-        }
-        if (this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA']) {
-          this.myShip.steer(-1);
-        }
-        if (this.keysPressed['ArrowRight'] || this.keysPressed['KeyD']) {
-          this.myShip.steer(1);
-        }
+        if (this.keysPressed['ArrowUp'] || this.keysPressed['KeyW']) this.myShip.accelerate(0.05 * delta);
+        if (this.keysPressed['ArrowDown'] || this.keysPressed['KeyS']) this.myShip.accelerate(-0.05 * delta);
+        if (this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA']) this.myShip.steer(-1);
+        if (this.keysPressed['ArrowRight'] || this.keysPressed['KeyD']) this.myShip.steer(1);
 
         if (!this.keysPressed['ArrowUp'] && !this.keysPressed['KeyW'] && !this.keysPressed['ArrowDown'] && !this.keysPressed['KeyS']) {
           this.myShip.speed *= 0.98; 
@@ -256,17 +184,10 @@ export class GameScene {
 
         const prevX = this.myShip.x;
         const prevY = this.myShip.y;
-
         this.myShip.update(delta);
 
-        // --- COLISÃO DO JOGADOR COM MAPA E TERRENO ---
         const margin = 40; 
-        const mapMinXLimit = this.mapMinX + margin;
-        const mapMaxXLimit = this.mapMaxX - margin;
-        const mapMinYLimit = this.mapMinY + margin;
-        const mapMaxYLimit = this.mapMaxY - margin;
-
-        if (this.myShip.x < mapMinXLimit || this.myShip.x > mapMaxXLimit || this.myShip.y < mapMinYLimit || this.myShip.y > mapMaxYLimit) {
+        if (this.myShip.x < this.mapMinX + margin || this.myShip.x > this.mapMaxX - margin || this.myShip.y < this.mapMinY + margin || this.myShip.y > this.mapMaxY - margin) {
           this.myShip.x = prevX;
           this.myShip.y = prevY;
           this.myShip.speed = -this.myShip.speed * 0.5; 
@@ -274,7 +195,6 @@ export class GameScene {
 
         const shipTileX = Math.floor(this.myShip.x / this.tileSize);
         const shipTileY = Math.floor(this.myShip.y / this.tileSize);
-
         const gridX = shipTileX - this.mapOriginTileX;
         const gridY = shipTileY - this.mapOriginTileY;
         const width = this.radiusInTiles * 2 + 1;
@@ -287,7 +207,7 @@ export class GameScene {
           }
         }
 
-        // --- PROJÉTEIS ---
+        // Projéteis
         for (let i = this.cannonBalls.length - 1; i >= 0; i--) {
           const ball = this.cannonBalls[i];
           const step = 12 * delta; 
@@ -306,7 +226,7 @@ export class GameScene {
 
               if (distToEnemy < 35) {
                 enemyData.hp -= 25;
-                this.createExplosion(ball.sprite.x, ball.sprite.y);
+                CombatManager.createExplosion(this.worldContainer, ball.sprite.x, ball.sprite.y);
                 this.playSound('ship_wood_hit_1.wav');
 
                 this.worldContainer.removeChild(ball.sprite);
@@ -318,17 +238,13 @@ export class GameScene {
                   this.playSound('ship_sinking.wav');
                   this.worldContainer.removeChild(enemyData.ship);
                   enemyData.ship.destroy();
-
                   this.worldContainer.removeChild(enemyData.healthContainer);
                   enemyData.healthContainer.destroy({ children: true });
-
                   this.enemies.splice(j, 1);
                   
                   this.score += 1;
                   this.playSound('score_point.wav');
-                  if (this.scoreText) {
-                    this.scoreText.text = `${this.score}`;
-                  }
+                  if (this.scoreText) this.scoreText.text = `${this.score}`;
                 }
                 break;
               }
@@ -340,7 +256,7 @@ export class GameScene {
 
             if (distToPlayer < 30) {
               this.playerHp = Math.max(0, this.playerHp - 15);
-              this.createExplosion(ball.sprite.x, ball.sprite.y);
+              CombatManager.createExplosion(this.worldContainer, ball.sprite.x, ball.sprite.y);
               this.playSound('ship_wood_hit_2.wav');
 
               this.worldContainer.removeChild(ball.sprite);
@@ -357,13 +273,10 @@ export class GameScene {
           const ballTileY = Math.floor(ball.sprite.y / this.tileSize);
           const ballGridX = ballTileX - this.mapOriginTileX;
           const ballGridY = ballTileY - this.mapOriginTileY;
-          const gridWidth = this.radiusInTiles * 2 + 1;
 
           let hitLand = false;
-          if (ballGridX >= 0 && ballGridX < gridWidth && ballGridY >= 0 && ballGridY < gridWidth) {
-            if (this.currentGrid[ballGridX]?.[ballGridY] === 'land') {
-              hitLand = true;
-            }
+          if (ballGridX >= 0 && ballGridX < width && ballGridY >= 0 && ballGridY < width) {
+            if (this.currentGrid[ballGridX]?.[ballGridY] === 'land') hitLand = true;
           }
 
           if (hitLand) {
@@ -374,11 +287,8 @@ export class GameScene {
             }
           }
 
-          const maxDistance = 350;
-          const maxLandPenetration = 3; 
-
-          if (ball.landTilesPenetrated >= maxLandPenetration || ball.distanceTraveled > maxDistance) {
-            this.createExplosion(ball.sprite.x, ball.sprite.y);
+          if (ball.landTilesPenetrated >= 3 || ball.distanceTraveled > 350) {
+            CombatManager.createExplosion(this.worldContainer, ball.sprite.x, ball.sprite.y);
             this.playSound('cannonball_water_hit_1.wav', 0.4);
             this.worldContainer.removeChild(ball.sprite);
             ball.sprite.destroy();
@@ -386,7 +296,7 @@ export class GameScene {
           }
         }
         
-        // --- IA DOS INIMIGOS ---
+        // Inimigos AI
         for (let j = this.enemies.length - 1; j >= 0; j--) {
           const enemyData = this.enemies[j];
           const enemy = enemyData.ship;
@@ -399,79 +309,104 @@ export class GameScene {
 
           let targetSpeed = 1.5;
 
-          const healthOffsetY = -40; 
           enemyData.healthContainer.x = enemy.x;
-          enemyData.healthContainer.y = enemy.y + healthOffsetY;
+          enemyData.healthContainer.y = enemy.y - 40;
 
           const hpPercentage = Math.max(0, enemyData.hp / enemyData.maxHp);
           enemyData.healthBarFill.width = enemyData.maxInternalWidth * hpPercentage;
+          enemyData.healthBarFill.texture = Texture.from(hpPercentage < 0.3 ? 'enemy_health_fill_red' : 'enemy_health_fill_green');
 
-          const currentFillTexName = hpPercentage < 0.3 ? 'enemy_health_fill_red' : 'enemy_health_fill_green';
-          const newTex = Texture.from(currentFillTexName);
-          if (newTex && enemyData.healthBarFill.texture !== newTex) {
-            enemyData.healthBarFill.texture = newTex;
-          }
-
-          if (enemyData.type === 'kamikaze') {
-            const kamikazeDetectionRange = 700; 
-            const explosionTouchRange = 45; 
-
-            if (distToPlayer <= explosionTouchRange) {
-              this.playerHp = Math.max(0, this.playerHp - 25);
-              this.createExplosion(enemy.x, enemy.y);
-              this.playSound('ship_explosion_1.wav', 0.8);
-
-              this.worldContainer.removeChild(enemy);
-              enemy.destroy();
-              this.worldContainer.removeChild(enemyData.healthContainer);
-              enemyData.healthContainer.destroy({ children: true });
-              this.enemies.splice(j, 1);
-              continue;
+          const mapGridWidth = this.radiusInTiles * 2 + 1;
+          const checkIsLand = (px: number, py: number) => {
+            const tX = Math.floor(px / this.tileSize);
+            const tY = Math.floor(py / this.tileSize);
+            const gX = tX - this.mapOriginTileX;
+            const gY = tY - this.mapOriginTileY;
+            if (gX >= 0 && gX < mapGridWidth && gY >= 0 && gY < mapGridWidth) {
+              return this.currentGrid[gX]?.[gY] === 'land';
             }
+            return false;
+          };
 
-            if (distToPlayer <= kamikazeDetectionRange && enemyData.escapeTimer <= 0) {
-              enemyData.state = 'kamikaze';
-              const targetAngle = Math.atan2(dy, dx);
-              
-              let angleDiff = targetAngle - enemy.rotation;
-              while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-              while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-              
-              enemy.rotation += angleDiff * 0.45 * delta;
-              targetSpeed = 3.0; 
+          // Sensores de desvio um pouco mais distantes para antecipar a curva
+          const lookAheadDist = 90;
+          const sideOffsetAngle = 0.5;
+          const aheadX = enemy.x + Math.cos(enemy.rotation) * lookAheadDist;
+          const aheadY = enemy.y + Math.sin(enemy.rotation) * lookAheadDist;
+          const leftAheadX = enemy.x + Math.cos(enemy.rotation - sideOffsetAngle) * (lookAheadDist * 0.8);
+          const leftAheadY = enemy.y + Math.sin(enemy.rotation - sideOffsetAngle) * (lookAheadDist * 0.8);
+          const rightAheadX = enemy.x + Math.cos(enemy.rotation + sideOffsetAngle) * (lookAheadDist * 0.8);
+          const rightAheadY = enemy.y + Math.sin(enemy.rotation + sideOffsetAngle) * (lookAheadDist * 0.8);
+
+          const hitCenter = checkIsLand(aheadX, aheadY);
+          const hitLeft = checkIsLand(leftAheadX, leftAheadY);
+          const hitRight = checkIsLand(rightAheadX, rightAheadY);
+
+          // Se ainda está no tempo de fuga/desvio
+          if (enemyData.escapeTimer > 0) {
+            enemyData.escapeTimer -= delta;
+            enemyData.state = 'escaping';
+            
+            // Mantém firmemente a direção de desvio escolhida (sem recalcular a cada frame)
+            const turnDir = enemyData.avoidanceDirection || 1;
+            enemy.rotation += 0.08 * turnDir * delta; 
+            targetSpeed = 1.6;
+          } 
+          else if (hitCenter || hitLeft || hitRight) {
+            // Acabou de detetar a ilha: inicia o desvio com tempo fixo para garantir estabilidade
+            enemyData.escapeTimer = 50; // Tempo maior de curva para contornar limpo
+            enemyData.state = 'escaping';
+
+            // Define a direção fixa com base em qual lado bateu (evita indecisão)
+            if (hitLeft && !hitRight) {
+              enemyData.avoidanceDirection = 1;  // Força curva para a direita
+            } else if (hitRight && !hitLeft) {
+              enemyData.avoidanceDirection = -1; // Força curva para a esquerda
             } else {
-              enemyData.state = 'wandering';
-              if (Math.random() < 0.05) {
-                enemyData.wanderAngle += (Math.random() - 0.5) * 2.0;
-              }
-              let angleDiff = enemyData.wanderAngle - enemy.rotation;
-              while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-              while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-              enemy.rotation += angleDiff * 0.1 * delta;
-              targetSpeed = 1.8;
+              enemyData.avoidanceDirection = Math.random() > 0.5 ? 1 : -1;
             }
           } 
           else {
-            if (enemyData.escapeTimer > 0) {
-              enemyData.escapeTimer -= delta;
-              enemyData.state = 'escaping';
-              let angleDiff = enemyData.wanderAngle - enemy.rotation;
-              while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-              while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-              enemy.rotation += angleDiff * 0.15 * delta;
-              targetSpeed = 2.0; 
-            } else {
-              const detectionRange = 650; 
-              const attackRange = 280;    
+            // --- MOVIMENTO NORMAL (SEM OBSTÁCULOS PRÓXIMOS) ---
+            if (enemyData.type === 'kamikaze') {
+              if (distToPlayer <= 45) {
+                this.playerHp = Math.max(0, this.playerHp - 25);
+                CombatManager.createExplosion(this.worldContainer, enemy.x, enemy.y);
+                this.playSound('ship_explosion_1.wav', 0.8);
 
-              if (distToPlayer <= detectionRange) {
+                this.worldContainer.removeChild(enemy);
+                enemy.destroy();
+                this.worldContainer.removeChild(enemyData.healthContainer);
+                enemyData.healthContainer.destroy({ children: true });
+                this.enemies.splice(j, 1);
+                continue;
+              }
+
+              if (distToPlayer <= 700) {
+                enemyData.state = 'kamikaze';
+                let angleDiff = Math.atan2(dy, dx) - enemy.rotation;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                enemy.rotation += angleDiff * 0.25 * delta; // Rotação mais suave rumo ao player
+                targetSpeed = 3.0; 
+              } else {
+                enemyData.state = 'wandering';
+                if (Math.random() < 0.05) enemyData.wanderAngle += (Math.random() - 0.5) * 2.0;
+                let angleDiff = enemyData.wanderAngle - enemy.rotation;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                enemy.rotation += angleDiff * 0.08 * delta;
+                targetSpeed = 1.8;
+              }
+            } else {
+              if (distToPlayer <= 650) {
                 const targetAngle = Math.atan2(dy, dx);
                 let angleDiff = targetAngle - enemy.rotation;
                 while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
                 while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-                enemy.rotation += angleDiff * 0.28 * delta;
+                enemy.rotation += angleDiff * 0.15 * delta; // Suavizado para evitar guinadas bruscas
 
-                if (distToPlayer > attackRange) {
+                if (distToPlayer > 280) {
                   enemyData.state = 'chasing';
                   targetSpeed = 1.5; 
                 } else {
@@ -481,15 +416,17 @@ export class GameScene {
                   if (enemyData.shootTimer > 75) { 
                     enemyData.shootTimer = 0;
                     if (Math.abs(angleDiff) < 0.4) {
-                      this.fireEnemyCannon(enemy);
+                      const ball = CombatManager.createCannonBall(enemy, this.worldContainer, true);
+                      if (ball) {
+                        this.playSound('cannon_fire_1.wav', 0.4);
+                        this.cannonBalls.push(ball);
+                      }
                     }
                   }
                 }
               } else {
                 enemyData.state = 'wandering';
-                if (Math.random() < 0.03) {
-                  enemyData.wanderAngle += (Math.random() - 0.5) * 2.0;
-                }
+                if (Math.random() < 0.03) enemyData.wanderAngle += (Math.random() - 0.5) * 2.0;
                 let angleDiff = enemyData.wanderAngle - enemy.rotation;
                 while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
                 while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -501,128 +438,24 @@ export class GameScene {
 
           enemy.speed += (targetSpeed - enemy.speed) * 0.08 * delta;
           enemy.update(delta);         
-          
-          const lookAheadDistance = 60;
-          const sideOffsetAngle = 0.5;
 
-          const aheadX = enemy.x + Math.cos(enemy.rotation) * lookAheadDistance;
-          const aheadY = enemy.y + Math.sin(enemy.rotation) * lookAheadDistance;
-
-          const leftX = enemy.x + Math.cos(enemy.rotation - sideOffsetAngle) * (lookAheadDistance * 0.8);
-          const leftY = enemy.y + Math.sin(enemy.rotation - sideOffsetAngle) * (lookAheadDistance * 0.8);
-
-          const rightX = enemy.x + Math.cos(enemy.rotation + sideOffsetAngle) * (lookAheadDistance * 0.8);
-          const rightY = enemy.y + Math.sin(enemy.rotation + sideOffsetAngle) * (lookAheadDistance * 0.8);
-
-          const checkIsLand = (px: number, py: number) => {
-            const tX = Math.floor(px / this.tileSize);
-            const tY = Math.floor(py / this.tileSize);
-            const gX = tX - this.mapOriginTileX;
-            const gY = tY - this.mapOriginTileY;
-            const gridW = this.radiusInTiles * 2 + 1;
-            if (gX >= 0 && gX < gridW && gY >= 0 && gY < gridW) {
-              return this.currentGrid[gX]?.[gY] === 'land';
-            }
-            return false;
-          };
-
-          const hitCenter = checkIsLand(aheadX, aheadY);
-          const hitLeft = checkIsLand(leftX, leftY);
-          const hitRight = checkIsLand(rightX, rightY);
-
-          if (hitCenter || hitLeft || hitRight || enemyData.escapeTimer > 0) {
-            if (enemyData.escapeTimer <= 0) {
-              enemyData.escapeTimer = 40;
-              
-              if (hitLeft && !hitRight) {
-                enemyData.avoidanceDirection = 1;
-              } else if (hitRight && !hitLeft) {
-                enemyData.avoidanceDirection = -1;
-              } else {
-                enemyData.avoidanceDirection = Math.random() > 0.5 ? 1 : -1;
-              }
-            }
-
-            enemyData.state = 'escaping';
-            const turnDir = enemyData.avoidanceDirection || 1;
-            enemy.rotation += 0.12 * turnDir * delta; 
-            enemy.speed *= 0.85; 
-            enemyData.wanderAngle = enemy.rotation;
-          } else if (enemyData.escapeTimer > 0) {
-            enemyData.escapeTimer -= delta;
-            if (enemyData.escapeTimer <= 0) {
-              enemyData.avoidanceDirection = undefined;
-            }
-          }
-
+          // Salvaguarda caso encoste na terra
           const enemyTileX = Math.floor(enemy.x / this.tileSize);
           const enemyTileY = Math.floor(enemy.y / this.tileSize);
           const eGridX = enemyTileX - this.mapOriginTileX;
           const eGridY = enemyTileY - this.mapOriginTileY;
 
-          let isCurrentlyOnLand = false;
-          if (eGridX >= 0 && eGridX < width && eGridY >= 0 && eGridY < width) {
+          if (eGridX >= 0 && eGridX < mapGridWidth && eGridY >= 0 && eGridY < mapGridWidth) {
             if (this.currentGrid[eGridX]?.[eGridY] === 'land') {
-              isCurrentlyOnLand = true;
+              enemy.x = prevEnemyX;
+              enemy.y = prevEnemyY;
+              enemy.speed = 0;
+              enemy.rotation += 0.3; // Força um pequeno giro para escapar se tocar na borda
             }
           }
 
-          if (isCurrentlyOnLand) {
-            enemy.x = prevEnemyX;
-            enemy.y = prevEnemyY;
-            enemy.speed = -1.0; 
-            enemy.rotation += 0.5; 
-          }
-
-          const mapMargin = 40;
-          const mapMinXLimit = this.mapMinX + mapMargin;
-          const mapMaxXLimit = this.mapMaxX - mapMargin;
-          const mapMinYLimit = this.mapMinY + mapMargin;
-          const mapMaxYLimit = this.mapMaxY - mapMargin;
-
-          if (enemy.x < mapMinXLimit || enemy.x > mapMaxXLimit || enemy.y < mapMinYLimit || enemy.y > mapMaxYLimit) {
-            enemy.x = prevEnemyX;
-            enemy.y = prevEnemyY;
-            enemy.rotation += Math.PI;
-          }
-
-          const collisionDistance = 45; 
-          if (distToPlayer < collisionDistance && enemyData.type !== 'kamikaze') {
-            enemy.x = prevEnemyX;
-            enemy.y = prevEnemyY;
-            enemy.speed = -enemy.speed * 0.5;
-
-            this.myShip.x = prevX;
-            this.myShip.y = prevY;
-            this.myShip.speed = -this.myShip.speed * 0.5;
-            this.playSound('ship_collision.wav');
-          }
+          this.worldContainer.sortChildren();
         }
-
-        this.worldContainer.sortChildren();
-
-        const stageScaleX = this.app.stage.scale.x;
-        const stageScaleY = this.app.stage.scale.y;
-
-        const currentCenterX = (this.app.renderer.width / stageScaleX) / 2;
-        const currentCenterY = (this.app.renderer.height / stageScaleY) / 2;
-
-        let targetX = currentCenterX - this.myShip.x;
-        let targetY = currentCenterY - this.myShip.y;
-
-        const screenWidth = this.app.renderer.width / stageScaleX;
-        const screenHeight = this.app.renderer.height / stageScaleY;
-
-        const minContainerX = screenWidth - this.mapMaxX;
-        const maxContainerX = -this.mapMinX;
-        const minContainerY = screenHeight - this.mapMaxY;
-        const maxContainerY = -this.mapMinY;
-
-        targetX = Math.max(minContainerX, Math.min(maxContainerX, targetX));
-        targetY = Math.max(minContainerY, Math.min(maxContainerY, targetY));
-
-        this.worldContainer.x += (targetX - this.worldContainer.x) * 0.1;
-        this.worldContainer.y += (targetY - this.worldContainer.y) * 0.1;
 
         let enemyInfoText = '';
         this.enemies.forEach((enemyData, index) => {
@@ -639,635 +472,85 @@ export class GameScene {
             enemyInfoText;
         }
 
-        // --- HUD DE VIDA DO JOGADOR ---
-        const playerHpPercentage = Math.max(0, this.playerHp / this.playerMaxHp);
-        const currentMaskWidth = this.playerMaxInternalWidth * playerHpPercentage;
+        const stageScaleX = this.app.stage.scale.x;
+        const stageScaleY = this.app.stage.scale.y;
+        const currentCenterX = (this.app.renderer.width / stageScaleX) / 2;
+        const currentCenterY = (this.app.renderer.height / stageScaleY) / 2;
 
-        if (this.playerHealthText) {
-          this.playerHealthText.text = `${Math.round(this.playerHp)} / ${this.playerMaxHp}`;
-        }
-        
+        let targetX = currentCenterX - this.myShip.x;
+        let targetY = currentCenterY - this.myShip.y;
+        const screenWidth = this.app.renderer.width / stageScaleX;
+        const screenHeight = this.app.renderer.height / stageScaleY;
+
+        targetX = Math.max(screenWidth - this.mapMaxX, Math.min(-this.mapMinX, targetX));
+        targetY = Math.max(screenHeight - this.mapMaxY, Math.min(-this.mapMinY, targetY));
+
+        this.worldContainer.x += (targetX - this.worldContainer.x) * 0.1;
+        this.worldContainer.y += (targetY - this.worldContainer.y) * 0.1;
+
+        const pPct = Math.max(0, this.playerHp / this.playerMaxHp);
+        if (this.playerHealthText) this.playerHealthText.text = `${Math.round(this.playerHp)} / ${this.playerMaxHp}`;
         if (this.playerHealthMask) {
           this.playerHealthMask.clear();
-          this.playerHealthMask.rect(
-            80 - (this.playerMaxInternalWidth / 2), 
-            15 - (this.playerHealthBarFill.height / 2), 
-            currentMaskWidth, 
-            this.playerHealthBarFill.height
-          );
+          this.playerHealthMask.rect(80 - (this.playerMaxInternalWidth / 2), 15 - (this.playerHealthBarFill.height / 2), this.playerMaxInternalWidth * pPct, this.playerHealthBarFill.height);
           this.playerHealthMask.fill(0xffffff);
         }
-
-        let playerTexName = 'health_fill_green';
-        if (playerHpPercentage < 0.41) {
-          playerTexName = 'health_fill_red';
-        } else if (playerHpPercentage < 0.71) {
-          playerTexName = 'health_fill_amber';
-        }
-
-        const newPlayerTex = Texture.from(playerTexName);
-        if (newPlayerTex && this.playerHealthBarFill.texture !== newPlayerTex) {
-          this.playerHealthBarFill.texture = newPlayerTex;
-        }
-        
       });
 
     } catch (e) {
-      console.error("Erro ao inicializar a GameScene ou carregar a tilesheet:", e);
+      console.error("Erro na GameScene:", e);
     }
-  }
-
-  private firePlayerBroadside(side: 'left' | 'right') {
-    if (!this.isAssetsLoaded) return;
-
-    const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
-    if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
-
-    this.playSound('cannon_broadside.wav', 0.7);
-
-    const sideOffset = side === 'left' ? -Math.PI / 2 : Math.PI / 2;
-    const baseRotation = this.myShip.rotation + sideOffset;
-    const spreadAngles = [ -Math.PI / 22, 0, Math.PI / 22 ];
-
-    spreadAngles.forEach((angleOffset) => {
-      const finalRotation = baseRotation + angleOffset;
-
-      const ballSprite = new Sprite(cannonTexture);
-      ballSprite.anchor.set(0.5);
-      ballSprite.width = 10;
-      ballSprite.height = 10;
-      ballSprite.zIndex = 15;
-
-      const spawnDistance = 30; 
-      ballSprite.x = this.myShip.x + Math.cos(finalRotation) * spawnDistance;
-      ballSprite.y = this.myShip.y + Math.sin(finalRotation) * spawnDistance;
-
-      this.worldContainer.addChild(ballSprite);
-
-      const vx = Math.cos(finalRotation);
-      const vy = Math.sin(finalRotation);
-
-      this.cannonBalls.push({
-        sprite: ballSprite,
-        vx,
-        vy,
-        distanceTraveled: 0,
-        landTilesPenetrated: 0,
-        hasExploded: false,
-        lastLandTileKey: '',
-        isEnemyShot: false
-      });
-    });
   }
 
   private fireCannon() {
     if (!this.isAssetsLoaded) return;
 
-    const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
-    if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
+    const currentTime = Date.now();
+    if (currentTime - this.lastShotTime < this.shootCooldown) return; // Impede o tiro se estiver no cooldown
+    this.lastShotTime = currentTime;
 
     const fireSounds = ['cannon_fire_1.wav', 'cannon_fire_2.wav', 'cannon_fire_3.wav'];
-    const randomFireSound = fireSounds[Math.floor(Math.random() * fireSounds.length)];
-    this.playSound(randomFireSound, 0.6);
+    this.playSound(fireSounds[Math.floor(Math.random() * fireSounds.length)], 0.6);
 
-    const ballSprite = new Sprite(cannonTexture);
-    ballSprite.anchor.set(0.5);
-    ballSprite.width = 10;
-    ballSprite.height = 10;
-    ballSprite.zIndex = 15;
-
-    const offset = 30;
-    ballSprite.x = this.myShip.x + Math.cos(this.myShip.rotation) * offset;
-    ballSprite.y = this.myShip.y + Math.sin(this.myShip.rotation) * offset;
-
-    this.worldContainer.addChild(ballSprite);
-
-    const vx = Math.cos(this.myShip.rotation);
-    const vy = Math.sin(this.myShip.rotation);
-
-    this.cannonBalls.push({
-      sprite: ballSprite,
-      vx,
-      vy,
-      distanceTraveled: 0,
-      landTilesPenetrated: 0,
-      hasExploded: false,
-      lastLandTileKey: '',
-      isEnemyShot: false
-    });
+    const ball = CombatManager.createCannonBall(this.myShip, this.worldContainer, false);
+    if (ball) this.cannonBalls.push(ball);
   }
 
-  private fireEnemyCannon(enemyShip: Ship) {
+  private firePlayerBroadside(side: 'left' | 'right') {
     if (!this.isAssetsLoaded) return;
 
-    const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
-    if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
+    const currentTime = Date.now();
+    if (currentTime - this.lastShotTime < this.shootCooldown) return; // Impede o broadside se estiver no cooldown
+    this.lastShotTime = currentTime;
 
-    this.playSound('cannon_fire_1.wav', 0.4);
-
-    const ballSprite = new Sprite(cannonTexture);
-    ballSprite.anchor.set(0.5);
-    ballSprite.width = 10;
-    ballSprite.height = 10;
-    ballSprite.zIndex = 15;
-
-    const offset = 30;
-    ballSprite.x = enemyShip.x + Math.cos(enemyShip.rotation) * offset;
-    ballSprite.y = enemyShip.y + Math.sin(enemyShip.rotation) * offset;
-
-    this.worldContainer.addChild(ballSprite);
-
-    const vx = Math.cos(enemyShip.rotation);
-    const vy = Math.sin(enemyShip.rotation);
-
-    this.cannonBalls.push({
-      sprite: ballSprite,
-      vx,
-      vy,
-      distanceTraveled: 0,
-      landTilesPenetrated: 0,
-      hasExploded: false,
-      lastLandTileKey: '',
-      isEnemyShot: true 
+    this.playSound('cannon_broadside.wav', 0.7);
+    const sideOffset = side === 'left' ? -Math.PI / 2 : Math.PI / 2;
+    [ -Math.PI / 22, 0, Math.PI / 22 ].forEach((angleOffset) => {
+      const ball = CombatManager.createCannonBall(this.myShip, this.worldContainer, false, sideOffset + angleOffset);
+      if (ball) this.cannonBalls.push(ball);
     });
-  }
-
-  private createExplosion(x: number, y: number) {
-    const explosionTexture = XMLAtlasLoader.getTexture('explosion_3.png');
-    if (!explosionTexture || explosionTexture === Texture.EMPTY) return;
-
-    const explosionSprite = new Sprite(explosionTexture);
-    explosionSprite.anchor.set(0.5);
-    explosionSprite.width = 48;
-    explosionSprite.height = 48;
-    explosionSprite.x = x;
-    explosionSprite.y = y;
-    explosionSprite.zIndex = 20;
-
-    this.worldContainer.addChild(explosionSprite);
-
-    setTimeout(() => {
-      if (explosionSprite && !explosionSprite.destroyed) {
-        this.worldContainer.removeChild(explosionSprite);
-        explosionSprite.destroy();
-      }
-    }, 400);
   }
 
   private spawnSingleEnemy() {
     if (!this.isAssetsLoaded) return;
-
-    const minDistanceFromPlayer = 400;
-    const gridWidth = this.radiusInTiles * 2 + 1;
-    const marginFromEdge = 5;
-    let attempts = 0;
-
-    while (attempts < 50) {
-      attempts++;
-
-      const randomGridX = Math.floor(Math.random() * (gridWidth - marginFromEdge * 2)) + marginFromEdge;
-      const randomGridY = Math.floor(Math.random() * (gridWidth - marginFromEdge * 2)) + marginFromEdge;
-
-      const gridType = this.currentGrid[randomGridX]?.[randomGridY];
-      if (!gridType || gridType === 'land') continue;
-
-      const tileX = this.mapOriginTileX + randomGridX;
-      const tileY = this.mapOriginTileY + randomGridY;
-      const posX = tileX * this.tileSize + this.tileSize / 2;
-      const posY = tileY * this.tileSize + this.tileSize / 2;
-
-      if (posX < this.mapMinX + 100 || posX > this.mapMaxX - 100 || posY < this.mapMinY + 100 || posY > this.mapMaxY - 100) {
-        continue;
-      }
-
-      const distX = posX - this.myShip.x;
-      const distY = posY - this.myShip.y;
-      const distanceToPlayer = Math.sqrt(distX * distX + distY * distY);
-
-      if (distanceToPlayer < minDistanceFromPlayer) continue;
-
-      const enemyType: 'shooter' | 'kamikaze' = Math.random() < 0.5 ? 'kamikaze' : 'shooter';
-      const enemyShip = new Ship(enemyType === 'kamikaze' ? 'pirate' : 'red', 0);
-      enemyShip.x = posX;
-      enemyShip.y = posY;
-      enemyShip.rotation = Math.random() * Math.PI * 2;
-      enemyShip.zIndex = 10;
-      this.worldContainer.addChild(enemyShip);
-
-      const healthContainer = new Container();
-      healthContainer.zIndex = 100; 
-
-      const frameTex = Texture.from('enemy_health_frame');
-      const greenFillTex = Texture.from('enemy_health_fill_green');
-
-      const barWidth = 60;
-      const barHeight = 15;
-      const maxInternalWidth = barWidth + 5; 
-
-      const fillSprite = new Sprite(greenFillTex);
-      fillSprite.width = maxInternalWidth;
-      fillSprite.height = barHeight;
-      fillSprite.anchor.set(0, 0.5);
-      fillSprite.x = -barWidth * 0.51; 
-      fillSprite.y = 0;
-
-      const frameSprite = new Sprite(frameTex);
-      frameSprite.width = barWidth;
-      frameSprite.height = barHeight;
-      frameSprite.anchor.set(0.5);
-      frameSprite.x = 0;
-      frameSprite.y = 0;
-
-      healthContainer.addChild(frameSprite);
-      healthContainer.addChild(fillSprite);
-      this.worldContainer.addChild(healthContainer);
-
-      this.enemies.push({
-        ship: enemyShip,
-        type: enemyType,
-        state: 'wandering',
-        shootTimer: 0,
-        wanderAngle: enemyShip.rotation,
-        escapeTimer: 0,
-        maxHp: 100,
-        hp: 100,
-        maxInternalWidth,
-        healthContainer,
-        healthBarFill: fillSprite
-      });
-
-      break;
-    }
+    const enemy = EnemyManager.spawnSingleEnemy(
+      this.worldContainer, this.myShip, this.currentGrid,
+      this.mapOriginTileX, this.mapOriginTileY, this.tileSize,
+      this.radiusInTiles, this.mapMinX, this.mapMaxX, this.mapMinY, this.mapMaxY
+    );
+    if (enemy) this.enemies.push(enemy);
   }
 
   private spawnEnemies() {
     if (!this.isAssetsLoaded) return;
-    const numberOfEnemies = useGameStore.getState().maxEnemies; 
-    for (let i = 0; i < numberOfEnemies; i++) {
+    for (let i = 0; i < this.maxAllowedEnemies; i++) {
       this.spawnSingleEnemy();
     }
   }
 
-  private createPlayerHUD() {
-    this.playerHealthContainer = new Container();
-    this.playerHealthContainer.zIndex = 1000; 
-    this.playerHealthContainer.x = 80;
-    this.playerHealthContainer.y = 30;
-
-    const frameIcon = Texture.from('icon_heart');
-    const frameTex = Texture.from('health_frame');
-    const greenFillTex = Texture.from('health_fill_green');
-
-    const barWidth = 205;
-    const barHeight = 38;
-    this.playerMaxInternalWidth = 165; 
-
-    const iconSprite = new Sprite(frameIcon);
-    iconSprite.width = 38;
-    iconSprite.height = 38;
-    iconSprite.anchor.set(0.0);
-    iconSprite.x = -60;
-    iconSprite.y = -2;
-
-    const frameSprite = new Sprite(frameTex);
-    frameSprite.width = barWidth;
-    frameSprite.height = barHeight;
-    frameSprite.anchor.set(0.5);
-    frameSprite.x = 80;
-    frameSprite.y = 15;
-
-    this.playerHealthBarFill = new Sprite(greenFillTex);
-    this.playerHealthBarFill.width = this.playerMaxInternalWidth + 39;
-    this.playerHealthBarFill.height = barHeight * 1.1;
-    this.playerHealthBarFill.anchor.set(0, 0.5);
-    this.playerHealthBarFill.x = 60 - (this.playerMaxInternalWidth / 2);
-    this.playerHealthBarFill.y = 15;
-
-    const maskGraphics = new Graphics();
-    maskGraphics.rect(
-      80 - (this.playerMaxInternalWidth / 2), 
-      15 - (this.playerHealthBarFill.height / 2), 
-      this.playerMaxInternalWidth, 
-      this.playerHealthBarFill.height
-    );
-    maskGraphics.fill(0xffffff);
-
-    this.playerHealthBarFill.mask = maskGraphics;
-    this.playerHealthMask = maskGraphics;
-
-    this.playerHealthText = new Text({
-      text: `${this.playerHp} / ${this.playerMaxHp}`,
-      style: { fill: '#ffffff', fontSize: 12, align: 'center' }
-    });
-    this.playerHealthText.anchor.set(0.5); 
-    this.playerHealthText.x = 80;          
-    this.playerHealthText.y = 15;          
-
-    this.playerHealthContainer.addChild(iconSprite);
-    this.playerHealthContainer.addChild(frameSprite);
-    this.playerHealthContainer.addChild(this.playerHealthBarFill);
-    this.playerHealthContainer.addChild(maskGraphics);
-    this.playerHealthContainer.addChild(this.playerHealthText);
-
-    this.app.stage.addChild(this.playerHealthContainer);
-  }
-
-  private createStatsHUD() {
-    this.statsContainer = new Container();
-    this.statsContainer.zIndex = 1000;
-    this.statsContainer.x = (this.app.screen.width / 2) - 140; 
-    this.statsContainer.y = 20;
-
-    const frameiconScore = Texture.from('icon_score');
-    const frameiconTime = Texture.from('icon_time');
-    const panelTexture = Texture.from('counter_panel');
-
-    const iconScore = new Sprite(frameiconScore);
-    iconScore.width = 38;
-    iconScore.height = 38;
-    iconScore.anchor.set(0.0);
-    iconScore.x = 205;
-    iconScore.y = 2;
-
-    const scorePanel = new Sprite(panelTexture);
-    scorePanel.width = 130;
-    scorePanel.height = 45;
-    scorePanel.x = 240;
-    scorePanel.y = 0;
-
-    this.scoreText = new Text({
-      text: `0`,
-      style: { fill: '#ffffff', fontSize: 14, fontWeight: 'bold' }
-    });
-    this.scoreText.anchor.set(0.5);
-    this.scoreText.x = scorePanel.x + scorePanel.width / 2;
-    this.scoreText.y = scorePanel.y + scorePanel.height / 2;
-
-    const iconTime = new Sprite(frameiconTime);
-    iconTime.width = 38;
-    iconTime.height = 38;
-    iconTime.anchor.set(0.0);
-    iconTime.x = 375;
-    iconTime.y = 2;
-
-    const timerPanel = new Sprite(panelTexture);
-    timerPanel.width = 130;
-    timerPanel.height = 45;
-    timerPanel.x = 410; 
-    timerPanel.y = 0;
-
-    this.timerText = new Text({
-      text: `03:00`,
-      style: { fill: '#ffffff', fontSize: 14 }
-    });
-    this.timerText.anchor.set(0.5);
-    this.timerText.x = timerPanel.x + timerPanel.width / 2;
-    this.timerText.y = timerPanel.y + timerPanel.height / 2;
-
-    this.statsContainer.addChild(iconScore);
-    this.statsContainer.addChild(iconTime);
-    this.statsContainer.addChild(scorePanel);
-    this.statsContainer.addChild(this.scoreText);
-    this.statsContainer.addChild(timerPanel);
-    this.statsContainer.addChild(this.timerText);
-
-    this.app.stage.addChild(this.statsContainer);
-  }
-
-  private generateTestMap() {
-    if (!this.isAssetsLoaded) return;
-
-    const seed = "meu-oceano-2026";
-    this.tileSize = 64; 
-    this.radiusInTiles = 30; 
-
-    const startTileX = Math.floor(this.myShip.x / this.tileSize);
-    const startTileY = Math.floor(this.myShip.y / this.tileSize);
-    
-    this.mapOriginTileX = startTileX - this.radiusInTiles;
-    this.mapOriginTileY = startTileY - this.radiusInTiles;
-
-    const cellSize = 10;
-
-    const calculateRawType = (tileX: number, tileY: number): 'deep' | 'shallow' | 'land' => {
-      const distToSpawnX = Math.abs(tileX - startTileX);
-      const distToSpawnY = Math.abs(tileY - startTileY);
-      if (distToSpawnX <= 1 && distToSpawnY <= 1) {
-        return 'shallow'; 
-      }
-
-      const cellX = Math.floor(tileX / cellSize);
-      const cellY = Math.floor(tileY / cellSize);
-      let closestDist = 999;
-
-      for (let cx = -1; cx <= 1; cx++) {
-        for (let cy = -1; cy <= 1; cy++) {
-          const neighborCellX = cellX + cx;
-          const neighborCellY = cellY + cy;
-          const cellRng = new SeedRandom(`${seed}_cell_${neighborCellX}_${neighborCellY}`);
-          
-          if (cellRng.next() < 0.55) {
-            const islandCenterX = neighborCellX * cellSize + Math.floor(cellRng.range(2, cellSize - 2));
-            const islandCenterY = neighborCellY * cellSize + Math.floor(cellRng.range(2, cellSize - 2));
-
-            const baseDist = Math.sqrt(Math.pow(tileX - islandCenterX, 2) + Math.pow(tileY - islandCenterY, 2));
-            const angle = Math.atan2(tileY - islandCenterY, tileX - islandCenterX);
-            const irregularity = Math.sin(angle * 3 + islandCenterX) * 0.5 + Math.cos(angle * 5 + islandCenterY) * 0.5;
-            const effectiveDist = baseDist + irregularity;
-
-            if (effectiveDist < closestDist) {
-              closestDist = effectiveDist;
-            }
-          }
-        }
-      }
-
-      if (closestDist <= 3.0) return 'land';
-      if (closestDist <= 4.6) return 'shallow';
-      return 'deep';
-    };
-
-    const grid: ('deep' | 'shallow' | 'land')[][] = [];
-    const width = this.radiusInTiles * 2 + 1;
-
-    for (let x = 0; x < width; x++) {
-      grid[x] = [];
-      for (let y = 0; y < width; y++) {
-        const tileX = startTileX + (x - this.radiusInTiles);
-        const tileY = startTileY + (y - this.radiusInTiles);
-        grid[x][y] = calculateRawType(tileX, tileY);
-      }
-    }
-
-    this.currentGrid = grid;
-
-    this.mapMinX = this.mapOriginTileX * this.tileSize;
-    this.mapMaxX = (this.mapOriginTileX + width) * this.tileSize;
-    this.mapMinY = this.mapOriginTileY * this.tileSize;
-    this.mapMaxY = (this.mapOriginTileY + width) * this.tileSize;
-
-    for (let x = 1; x < width - 1; x++) {
-      for (let y = 1; y < width - 1; y++) {
-        const current = grid[x][y];
-
-        if (current === 'land') {
-          let orthoLand = 0;
-          if (grid[x + 1][y] === 'land') orthoLand++;
-          if (grid[x - 1][y] === 'land') orthoLand++;
-          if (grid[x][y + 1] === 'land') orthoLand++;
-          if (grid[x][y - 1] === 'land') orthoLand++;
-
-          if (orthoLand < 2) {
-            grid[x][y] = 'shallow';
-          }
-        } else if (current === 'shallow') {
-          let connections = 0;
-          if (grid[x + 1][y] === 'land' || grid[x + 1][y] === 'shallow') connections++;
-          if (grid[x - 1][y] === 'land' || grid[x - 1][y] === 'shallow') connections++;
-          if (grid[x][y + 1] === 'land' || grid[x][y + 1] === 'shallow') connections++;
-          if (grid[x][y - 1] === 'land' || grid[x][y - 1] === 'shallow') connections++;
-
-          if (connections < 2) {
-            grid[x][y] = 'deep';
-          }
-        } else {
-          let landSurround = 0;
-          for (let nx = -1; nx <= 1; nx++) {
-            for (let ny = -1; ny <= 1; ny++) {
-              if (grid[x + nx]?.[y + ny] === 'land') landSurround++;
-            }
-          }
-          if (landSurround >= 7) {
-            grid[x][y] = 'land';
-          }
-        }
-      }
-    }
-
-    const getGridType = (gx: number, gy: number): 'deep' | 'shallow' | 'land' => {
-      if (gx < 0 || gx >= width || gy < 0 || gy >= width) return 'deep';
-      return grid[gx][gy];
-    };
-
-    for (let x = 0; x < width; x++) {
-      for (let y = 0; y < width; y++) {
-        const tileX = startTileX + (x - this.radiusInTiles);
-        const tileY = startTileY + (y - this.radiusInTiles);
-        const tileType = grid[x][y];
-
-        const deepWaterSprite = new Sprite(TileHelper.getTextureByCoords(TILE_COORDS.DEEP_WATER));
-        deepWaterSprite.width = this.tileSize;
-        deepWaterSprite.height = this.tileSize;
-        deepWaterSprite.x = tileX * this.tileSize;
-        deepWaterSprite.y = tileY * this.tileSize;
-        deepWaterSprite.zIndex = 0;
-        this.worldContainer.addChildAt(deepWaterSprite, 0);
-
-        const top = getGridType(x, y - 1);
-        const bottom = getGridType(x, y + 1);
-        const left = getGridType(x - 1, y);
-        const right = getGridType(x + 1, y);
-
-        const isNorthWater = top !== 'land';
-        const isSouthWater = bottom !== 'land';
-        const isWestWater = left !== 'land';
-        const isEastWater = right !== 'land';
-
-        const isBorder = isNorthWater || isSouthWater || isWestWater || isEastWater;
-
-        if (tileType === 'shallow' || (tileType === 'land' && isBorder)) {
-          let shallowCoords = TILE_COORDS.SHALLOW_WATER.CENTER;
-          
-          if (tileType === 'shallow') {
-            const isNorthDeep = top === 'deep';
-            const isSouthDeep = bottom === 'deep';
-            const isWestDeep = left === 'deep';
-            const isEastDeep = right === 'deep';
-
-            if (isNorthDeep && isWestDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.NW;
-            else if (isNorthDeep && isEastDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.NE;
-            else if (isSouthDeep && isWestDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.SW;
-            else if (isSouthDeep && isEastDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.SE;
-            else if (isNorthDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.N;
-            else if (isSouthDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.S;
-            else if (isWestDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.W;
-            else if (isEastDeep) shallowCoords = TILE_COORDS.SHALLOW_WATER.E;
-          }
-
-          const shallowSprite = new Sprite(TileHelper.getTextureByCoords(shallowCoords));
-          shallowSprite.width = this.tileSize;
-          shallowSprite.height = this.tileSize;
-          shallowSprite.x = tileX * this.tileSize;
-          shallowSprite.y = tileY * this.tileSize;
-          shallowSprite.zIndex = 1;
-          this.worldContainer.addChild(shallowSprite);
-        }
-
-        if (tileType === 'land') {
-          let sandCoords = TILE_COORDS.SAND.CENTER;
-
-          if (isBorder) {
-            if (isNorthWater && isWestWater) sandCoords = TILE_COORDS.SAND.NW;
-            else if (isNorthWater && isEastWater) sandCoords = TILE_COORDS.SAND.NE;
-            else if (isSouthWater && isWestWater) sandCoords = TILE_COORDS.SAND.SW;
-            else if (isSouthWater && isEastWater) sandCoords = TILE_COORDS.SAND.SE;
-            else if (isNorthWater) sandCoords = TILE_COORDS.SAND.N;
-            else if (isSouthWater) sandCoords = TILE_COORDS.SAND.S;
-            else if (isWestWater) sandCoords = TILE_COORDS.SAND.W;
-            else if (isEastWater) sandCoords = TILE_COORDS.SAND.E;
-          }
-
-          const sandSprite = new Sprite(TileHelper.getTextureByCoords(sandCoords));
-          sandSprite.width = this.tileSize;
-          sandSprite.height = this.tileSize;
-          sandSprite.x = tileX * this.tileSize;
-          sandSprite.y = tileY * this.tileSize;
-          sandSprite.zIndex = 2;
-          this.worldContainer.addChild(sandSprite);
-
-          const poiRng = new SeedRandom(`${seed}_poi_${tileX}_${tileY}`);
-          if (poiRng.next() < 0.02 && !isBorder) {
-            const towerSprite = new Sprite(TileHelper.getTextureByCoords(TILE_COORDS.STRUCTURES.TOWER_1));
-            towerSprite.width = this.tileSize;
-            towerSprite.height = this.tileSize;
-            towerSprite.x = tileX * this.tileSize;
-            towerSprite.y = tileY * this.tileSize;
-            towerSprite.zIndex = 4;
-            this.worldContainer.addChild(towerSprite);
-          }
-        }
-      }
-    }
-  }
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (this.isPaused && e.code !== 'Escape') return;
-    if (this.keysPressed[e.code]) return; 
-    this.keysPressed[e.code] = true;
-
-    if (e.code === 'Space') { this.fireCannon(); } 
-    
-    if (e.code === 'Escape' && this.isGameOver === false) { 
-      useGameStore.getState().setScreen('paused');
-    }
-
-    if (e.code === 'KeyQ') {
-      this.firePlayerBroadside('left');
-    } 
-
-    if (e.code === 'KeyE') {
-      this.firePlayerBroadside('right');
-    }
-  };
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    this.keysPressed[e.code] = false;
-  };
-
-  // --- MÉTODOS PÚBLICOS PARA CONTROLE MOBILE ---
-  public setMobileMovement(direction: 'forward' | 'backward' | 'stop') {
-    this.keysPressed['KeyW'] = direction === 'forward';
-    this.keysPressed['KeyS'] = direction === 'backward';
+  public setMobileMovement(dir: 'forward' | 'backward' | 'stop') {
+    this.keysPressed['KeyW'] = dir === 'forward';
+    this.keysPressed['KeyS'] = dir === 'backward';
   }
 
   public setMobileSteer(steer: number) {
@@ -1275,36 +558,32 @@ export class GameScene {
     this.keysPressed['KeyD'] = steer > 0.2;
   }
 
-  public fireCannonMobile() {
-    this.fireCannon();
-  }
+  public fireCannonMobile() { this.fireCannon(); }
+  public firePlayerBroadsideMobile(side: 'left' | 'right') { this.firePlayerBroadside(side); }
 
-  public firePlayerBroadsideMobile(side: 'left' | 'right') {
-    this.firePlayerBroadside(side);
-  }
+  private onKeyDown = (e: KeyboardEvent) => {
+    if (this.isPaused && e.code !== 'Escape') return;
+    
+    // Removemos o bloqueio 'if (this.keysPressed[e.code]) return' apenas para teclas de tiro 
+    // se quisermos gerir pelo cooldown de tempo, mas mantemos para evitar spam contínuo 
+    // ou deixamos o cooldown tratar disso. O cooldown por tempo já resolve perfeitamente!
+    
+    if (this.keysPressed[e.code]) return; 
+    this.keysPressed[e.code] = true;
+
+    if (e.code === 'Space') { this.fireCannon(); } 
+    if (e.code === 'Escape') { useGameStore.getState().setScreen('paused'); }
+    if (e.code === 'KeyQ') { this.firePlayerBroadside('left'); } 
+    if (e.code === 'KeyE') { this.firePlayerBroadside('right'); }
+  };
+
+  private onKeyUp = (e: KeyboardEvent) => { 
+    this.keysPressed[e.code] = false; 
+  };
 
   public destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
-    if (this.myShip) {
-      this.myShip.destroy();
-    }
-    if (this.playerHealthContainer && !this.playerHealthContainer.destroyed) {
-      this.playerHealthContainer.destroy({ children: true });
-    }
-    if (this.statsContainer && !this.statsContainer.destroyed) {
-      this.statsContainer.destroy({ children: true });
-    }
-    for (const ball of this.cannonBalls) {
-      ball.sprite.destroy();
-    }
-    for (const enemyData of this.enemies) {
-      enemyData.ship.destroy();
-      if (enemyData.healthContainer && !enemyData.healthContainer.destroyed) {
-        enemyData.healthContainer.destroy({ children: true });
-      }
-    }
-    this.enemies = [];
-    this.cannonBalls = [];
+    this.worldContainer.destroy({ children: true });
   }
 }
