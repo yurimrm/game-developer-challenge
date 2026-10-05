@@ -525,6 +525,52 @@ export class GameScene {
     }
   }
 
+  // Método auxiliar para disparar a rajada lateral do jogador usando o array cannonBalls existente
+  private firePlayerBroadside(side: 'left' | 'right') {
+
+    if (!this.isAssetsLoaded) return;
+
+    const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
+    if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
+
+    // Define o deslocamento do flanco (-90° para esquerda, +90° para direita)
+    const sideOffset = side === 'left' ? -Math.PI / 2 : Math.PI / 2;
+    const baseRotation = this.myShip.rotation + sideOffset;
+
+    // Os 3 ângulos da rajada
+    const spreadAngles = [ -Math.PI / 22, 0, Math.PI / 22 ];
+
+    spreadAngles.forEach((angleOffset) => {
+      const finalRotation = baseRotation + angleOffset;
+
+      const ballSprite = new Sprite(cannonTexture);
+      ballSprite.anchor.set(0.5);
+      ballSprite.width = 10;
+      ballSprite.height = 10;
+      ballSprite.zIndex = 15;
+
+      const spawnDistance = 30; 
+      ballSprite.x = this.myShip.x + Math.cos(finalRotation) * spawnDistance;
+      ballSprite.y = this.myShip.y + Math.sin(finalRotation) * spawnDistance;
+
+      this.worldContainer.addChild(ballSprite);
+
+      const vx = Math.cos(finalRotation);
+      const vy = Math.sin(finalRotation);
+
+      this.cannonBalls.push({
+        sprite: ballSprite,
+        vx,
+        vy,
+        distanceTraveled: 0,
+        landTilesPenetrated: 0,
+        hasExploded: false,
+        lastLandTileKey: '',
+        isEnemyShot: false
+      });
+    });
+  }
+
   private fireCannon() {
     if (!this.isAssetsLoaded) return;
 
@@ -1063,10 +1109,19 @@ export class GameScene {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (this.keysPressed[e.code]) return; 
     this.keysPressed[e.code] = true;
 
     if (e.code === 'Space') {
       this.fireCannon();
+    } 
+    else if (e.code === 'KeyQ') {
+      // Usa o navio correto (this.myShip) e dispara para a esquerda
+      this.firePlayerBroadside('left');
+    } 
+    else if (e.code === 'KeyE') {
+      // Usa o navio correto (this.myShip) e dispara para a direita
+      this.firePlayerBroadside('right');
     }
   };
 
