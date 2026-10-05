@@ -13,7 +13,7 @@ export const MatchHistoryBoard: React.FC = () => {
 
   // Estados para controle da paginação baseada nos registros filtrados
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 4;
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -30,10 +30,11 @@ export const MatchHistoryBoard: React.FC = () => {
 
   return (
     <div className="overlay">
-      <div className="containerMenu" style={{ width: '650px' }}>
+      <div className="containerMenuBig">
+
         <h2>MATCH HISTORY</h2>
 
-        <div className="containerTable" style={{ margin: '15px 0' }}>
+        <div className="containerTable">
           <table className="tableRanking label" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -88,7 +89,7 @@ export const MatchHistoryBoard: React.FC = () => {
         )}
 
         {/* Botão de Retorno dinâmico */}
-        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+        <div style={{ marginTop: '10px', textAlign: 'center' }}>
           {openedFromPause ? (
             <button className="primaryButton" onClick={handleBack}>
               Back

@@ -41,7 +41,6 @@ export class GameScene {
 
   private mobileInputAngle: number | null = null;
   private isMobileMoving: boolean = false;
-  private lastMobileAngle: number = 0;
 
   private lastShotTime: number = 0;
   private shootCooldown: number = 300; // Milissegundos entre cada tiro (ajuste se quiser mais lento/rápido)
@@ -587,10 +586,6 @@ export class GameScene {
   public setMobileJoystick(angle: number | null, isMoving: boolean) {
     this.isMobileMoving = isMoving;
     this.mobileInputAngle = angle;
-
-    if (angle !== null) {
-      this.lastMobileAngle = angle; // Guarda sempre a última direção apontada
-    }
 
     if (!isMoving) {
       this.keysPressed['KeyW'] = false;
