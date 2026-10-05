@@ -38,7 +38,7 @@ export const MainMenu: React.FC = () => {
         
       <img src="assets/ui/title_pirate_battle.png" alt="Pirate Battle" className='logo' />
 
-        <div className="optionField" style={{ margin: '20px 0' }}>
+        <div className="optionField" style={{ marginBottom: '20px' }}>
           <input 
             type="text" 
             value={nameInput} 

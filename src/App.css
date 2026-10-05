@@ -1,11 +1,24 @@
+/* No seu arquivo CSS global (ex: index.css ou App.css) */
 html, body {
   margin: 0;
   padding: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background-color: #111;
+  background-color: #000;
 }
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 canvas {
   display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain; /* Mantém a proporção original sem cortar as pontas */
 }

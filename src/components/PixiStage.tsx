@@ -35,8 +35,8 @@ export const PixiStage: React.FC = () => {
       const app = new Application();
       appRef.current = app;
 
+      // Inicializamos sem o resizeTo para gerenciar o letterbox manualmente com precisão total
       await app.init({
-        resizeTo: window,
         backgroundColor: 0x111111,
         width: DESIGN_WIDTH,
         height: DESIGN_HEIGHT,
@@ -68,15 +68,17 @@ export const PixiStage: React.FC = () => {
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
 
+        // O renderer preenche a janela inteira
+        app.renderer.resize(windowWidth, windowHeight);
+
         const scaleX = windowWidth / DESIGN_WIDTH;
         const scaleY = windowHeight / DESIGN_HEIGHT;
         const scale = Math.min(scaleX, scaleY);
 
-        const targetWidth = Math.floor(DESIGN_WIDTH * scale);
-        const targetHeight = Math.floor(DESIGN_HEIGHT * scale);
-
-        app.renderer.resize(targetWidth, targetHeight);
+        // Escala e centraliza o stage perfeitamente sem cortes nas pontas
         app.stage.scale.set(scale);
+        app.stage.x = (windowWidth - DESIGN_WIDTH * scale) / 2;
+        app.stage.y = (windowHeight - DESIGN_HEIGHT * scale) / 2;
       };
 
       handleResize();
@@ -110,21 +112,24 @@ export const PixiStage: React.FC = () => {
         width: '100vw',
         height: '100vh',
         overflow: 'hidden',
-        position: 'absolute',
+        position: 'fixed',
         top: 0,
         left: 0,
-        backgroundColor: '#000000'
+        backgroundColor: '#000000',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
       }}
     >
       {/* Container do Canvas PixiJS */}
       <div 
         ref={containerRef} 
         style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
           width: '100%',
           height: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
         }} 
       />
 

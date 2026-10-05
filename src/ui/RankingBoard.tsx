@@ -6,7 +6,7 @@ export const RankingBoard: React.FC = () => {
 
   // Estados para controle da paginação
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 4;
 
   // Cálculos da paginação
   const indexOfLastItem = currentPage * itemsPerPage;

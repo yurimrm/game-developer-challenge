@@ -69,7 +69,7 @@ export const OptionsScreen: React.FC = () => {
 
         </div>
 
-        <div className="buttonContainer">
+        <div>
 
           <button className="primaryButton" onClick={handleSave}>
             Salvar
