@@ -6,7 +6,7 @@ import { GameScene } from '../scenes/GameScene';
 import { useGameStore } from '../ui/GameStore';
 import { MobileControls } from '../ui/MobileControls';
 
-const DESIGN_WIDTH = 1280;
+const DESIGN_WIDTH = 1650;
 const DESIGN_HEIGHT = 720;
 
 export const PixiStage: React.FC = () => {

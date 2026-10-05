@@ -82,7 +82,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
-      padding: '100px',
+      padding: '50px',
       boxSizing: 'border-box',
     }}>
       {/* ⏸️ BOTÃO DE PAUSE (Topo Direito absoluto) */}
