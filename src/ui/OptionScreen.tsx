@@ -33,12 +33,12 @@ export const OptionsScreen: React.FC = () => {
     
       <div className='containerMenu'>
 
-        <h2>Configurações da Batalha</h2>
+        <h2>OPTIONS</h2>
 
         <div className='listaInputs'>
         
           <div className='formGroup'>
-            <label className='label'>Tempo Total de Jogo (segundos):</label>
+            <label className='label'>Total Time (sec):</label>
             <input 
               type="number" 
               value={duration}
@@ -48,7 +48,7 @@ export const OptionsScreen: React.FC = () => {
           </div>
 
           <div className='formGroup'>
-            <label className='label'>Máximo de Inimigos Simultâneos:</label>
+            <label className='label'>Max. Enemies:</label>
             <input 
               type="number" 
               value={enemies}
@@ -58,7 +58,7 @@ export const OptionsScreen: React.FC = () => {
           </div>
 
           <div className='formGroup'>
-            <label className='label'>Taxa de Respawn:</label>
+            <label className='label'>Respawn Tax:</label>
             <input 
               type="number" 
               value={rate}

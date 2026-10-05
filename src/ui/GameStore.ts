@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type GameScreen = 'main_menu' | 'options' | 'ranking' | 'playing' | 'paused' | 'game_over';
+export type GameScreen = 'main_menu' | 'options' | 'ranking' | 'playing' | 'paused' | 'game_over' | 'match_history';
 
 export interface RankingItem {
   name: string;
@@ -8,6 +8,14 @@ export interface RankingItem {
   date: string;
 }
 
+export interface MatchRecord {
+  id: string;
+  playerName: string;
+  score: number;
+  timeSurvived: string;
+  enemiesDefeated: number;
+  date: string;
+}
 
 // Chaves para o LocalStorage
 const STORAGE_KEYS = {
@@ -17,7 +25,8 @@ const STORAGE_KEYS = {
 
 interface GameState {
   currentScreen: GameScreen;
-  setScreen: (screen: GameScreen) => void;
+  openedFromPause: boolean; // Flag direta
+  setScreen: (screen: GameScreen, openedFromPause?: boolean) => void;
   
   // Configurações persistidas
   playerName: string;
@@ -35,11 +44,19 @@ interface GameState {
 
   rankings: RankingItem[];
   addRanking: (name: string, score: number) => void;
+
+  matchHistory: MatchRecord[];
+  addMatchRecord: (record: Omit<MatchRecord, 'id' | 'date'>) => void;
+
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
   currentScreen: 'main_menu',
-  setScreen: (screen) => set({ currentScreen: screen }),
+  openedFromPause: false, 
+
+  setScreen: (screen, openedFromPause = false) => {
+    set({ currentScreen: screen, openedFromPause });
+  },
 
   playerName: localStorage.getItem('pirate_player_name') || 'Capitão Sem Nome',
   setPlayerName: (name) => {
@@ -130,5 +147,26 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({ rankings: updatedRankings });
     localStorage.setItem('pirate_rankings', JSON.stringify(updatedRankings));
-  }
+  },
+
+  // Carrega o histórico do LocalStorage
+  matchHistory: (() => {
+    const saved = localStorage.getItem('pirate_match_history');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return [];
+  })(),
+
+  addMatchRecord: (recordData) => {
+    const newRecord: MatchRecord = {
+      id: Math.random().toString(36).substring(2, 9),
+      date: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      ...recordData,
+    };
+
+    const updatedHistory = [newRecord, ...get().matchHistory]; // As mais recentes primeiro
+    set({ matchHistory: updatedHistory });
+    localStorage.setItem('pirate_match_history', JSON.stringify(updatedHistory));
+  },
 }));

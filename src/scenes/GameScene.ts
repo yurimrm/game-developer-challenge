@@ -13,6 +13,7 @@ export class GameScene {
   
   private isPaused: boolean = false;
   private isGameOver: boolean = false;
+  private isGameOverTriggered: boolean = false; // Trava de salvamento único
   
   private app: Application;
   private worldContainer: Container;
@@ -45,8 +46,8 @@ export class GameScene {
 
   // Sistema de Jogo (Pontuação e Tempo)
   private score: number = 0;
-  private remainingTime: number = useGameStore.getState().matchDuration; // Pega a duração configurada nas Opções
-  private maxAllowedEnemies: number = useGameStore.getState().maxEnemies; // Pega o limite máximo de inimigos
+  private remainingTime: number = useGameStore.getState().matchDuration; 
+  private maxAllowedEnemies: number = useGameStore.getState().maxEnemies; 
   private timeElapsedAccumulator: number = 0; 
   private scoreText!: Text;
   private timerText!: Text;
@@ -94,6 +95,9 @@ export class GameScene {
 
   private async init() {
     try {
+      // Garante que a flag de game over inicie limpa em cada nova sessão da cena
+      this.isGameOverTriggered = false;
+
       await AssetManager.getInstance().loadGameAssets();
 
       const tileSheetTexture = Assets.get('/assets/tilesheet/tiles_sheet.png');
@@ -133,23 +137,38 @@ export class GameScene {
 
       this.app.ticker.add((ticker) => {
         
-
         // --- MENU DE PAUSE ---
         if (this.isPaused) return;
 
-        // --- CONDIÇÃO DE GAME OVER ---
-        if (this.playerHp <= 0 || this.remainingTime <= 0) {
-          // Pega o nome e o score atuais da store
-          const { playerName } = useGameStore.getState();
+        // --- CONDIÇÃO DE GAME OVER (BLOCADA COM A TRAVA) ---
+        if ((this.playerHp <= 0 || this.remainingTime <= 0) && !this.isGameOverTriggered) {
+          this.isGameOverTriggered = true; // Trava ativada instantaneamente
+
+          const { playerName, matchDuration } = useGameStore.getState();
+          const timeLeft = this.remainingTime;
+          const timeSpentSeconds = matchDuration - timeLeft;
           
-          // Adiciona ao ranking persistido
+          const mins = Math.floor(timeSpentSeconds / 60);
+          const secs = timeSpentSeconds % 60;
+          const timeFormatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+          // Adiciona ao Histórico de Partidas e Ranking exatamente UMA vez
+          useGameStore.getState().addMatchRecord({
+            playerName: playerName,
+            score: this.score,
+            timeSurvived: timeFormatted,
+            enemiesDefeated: this.score, 
+          });
+
           useGameStore.getState().addRanking(playerName, this.score);
-          
-          // Atualiza as estatísticas e muda para a tela de game over
-          useGameStore.getState().setCurrentGameStats(this.score, this.remainingTime);
+
+          useGameStore.getState().setCurrentGameStats(this.score, timeLeft);
           useGameStore.getState().setScreen('game_over');
           return;
         }
+
+        // Se já disparou o game over, evita processar o restante dos cálculos do frame atual
+        if (this.isGameOverTriggered) return;
 
         const delta = ticker.deltaTime;
 
@@ -267,13 +286,10 @@ export class GameScene {
 
                   this.enemies.splice(j, 1);
                   
-                  // Incrementa pontuação ao destruir inimigo
                   this.score += 1;
                   if (this.scoreText) {
                     this.scoreText.text = `${this.score}`;
                   }
-
-                  console.log("Navio inimigo destruído! Pontos:", this.score);
                 }
                 break;
               }
@@ -331,7 +347,7 @@ export class GameScene {
           }
         }
         
-        // --- 4. ATUALIZAÇÃO DA IA DOS INIMIGOS, INÉRCIA E Fuga de Obstáculos ---
+        // --- 4. ATUALIZAÇÃO DA IA DOS INIMIGOS ---
         for (const enemyData of this.enemies) {
           const enemy = enemyData.ship;
           const dx = this.myShip.x - enemy.x;
@@ -562,11 +578,9 @@ export class GameScene {
     const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
     if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
 
-    // Define o deslocamento do flanco (-90° para esquerda, +90° para direita)
     const sideOffset = side === 'left' ? -Math.PI / 2 : Math.PI / 2;
     const baseRotation = this.myShip.rotation + sideOffset;
 
-    // Os 3 ângulos da rajada
     const spreadAngles = [ -Math.PI / 22, 0, Math.PI / 22 ];
 
     spreadAngles.forEach((angleOffset) => {
@@ -709,7 +723,6 @@ export class GameScene {
       const randomGridX = Math.floor(Math.random() * (gridWidth - marginFromEdge * 2)) + marginFromEdge;
       const randomGridY = Math.floor(Math.random() * (gridWidth - marginFromEdge * 2)) + marginFromEdge;
 
-      // VERIFICAÇÃO DE SEGURANÇA: Impede spawn em cima de terra (ilhas)
       const gridType = this.currentGrid[randomGridX]?.[randomGridY];
       if (!gridType || gridType === 'land') continue;
 
@@ -783,11 +796,10 @@ export class GameScene {
 
   private spawnEnemies() {
     if (!this.isAssetsLoaded) return;
-    const numberOfEnemies = useGameStore.getState().maxEnemies; // Respeita o limite escolhido
+    const numberOfEnemies = useGameStore.getState().maxEnemies; 
     for (let i = 0; i < numberOfEnemies; i++) {
       this.spawnSingleEnemy();
     }
-    console.log(`${numberOfEnemies} navios inimigos gerados com base nas opções!`);
   }
 
   private createPlayerHUD() {
@@ -826,7 +838,6 @@ export class GameScene {
     this.playerHealthBarFill.x = 60 - (this.playerMaxInternalWidth / 2);
     this.playerHealthBarFill.y = 15;
 
-    // --- MÁSCARA CORRIGIDA PARA O PIXIJS v8 ---
     const maskGraphics = new Graphics();
     maskGraphics.rect(
       80 - (this.playerMaxInternalWidth / 2), 
@@ -865,15 +876,12 @@ export class GameScene {
     this.statsContainer = new Container();
     this.statsContainer.zIndex = 1000;
     
-    // Teste temporário: posicionamento centralizado no topo da tela (visível garantido)
     this.statsContainer.x = (this.app.screen.width / 2) - 140; 
     this.statsContainer.y = 20;
 
     const frameiconScore = Texture.from('icon_score');
     const frameiconTime = Texture.from('icon_time');
     const panelTexture = Texture.from('counter_panel');
-
-    // Painel de Pontuação
 
     const iconScore = new Sprite(frameiconScore);
     iconScore.width = 38;
@@ -895,8 +903,6 @@ export class GameScene {
     this.scoreText.anchor.set(0.5);
     this.scoreText.x = scorePanel.x + scorePanel.width / 2;
     this.scoreText.y = scorePanel.y + scorePanel.height / 2;
-
-    // Painel de Tempo
 
     const iconTime = new Sprite(frameiconTime);
     iconTime.width = 38;
@@ -926,7 +932,6 @@ export class GameScene {
     this.statsContainer.addChild(timerPanel);
     this.statsContainer.addChild(this.timerText);
 
-    // Certifique-se de adicionar ao stage principal da aplicação
     this.app.stage.addChild(this.statsContainer);
   }
 
@@ -1148,17 +1153,14 @@ export class GameScene {
     if (e.code === 'Space') { this.fireCannon(); } 
     
     if (e.code === 'Escape' && this.isGameOver === false) { 
-      // Altera a tela no Zustand para 'paused'
       useGameStore.getState().setScreen('paused');
     }
 
     if (e.code === 'KeyQ') {
-      // Usa o navio correto (this.myShip) e dispara para a esquerda
       this.firePlayerBroadside('left');
     } 
 
     if (e.code === 'KeyE') {
-      // Usa o navio correto (this.myShip) e dispara para a direita
       this.firePlayerBroadside('right');
     }
 

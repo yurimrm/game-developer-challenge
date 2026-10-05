@@ -14,7 +14,7 @@ export const PauseMenu: React.FC = () => {
         
         <div className='buttonContainer'>
           <button className='primaryButton' onClick={() => setScreen('playing')}>Resume</button>
-          <button className='primaryButton' onClick={() => setScreen('ranking')}>Ranking</button>
+          <button className='primaryButton' onClick={() => setScreen('ranking', true)}>Ranking</button>
           <button className='primaryButton' onClick={() => setScreen('main_menu')}>Main Menu</button>
         </div>
 

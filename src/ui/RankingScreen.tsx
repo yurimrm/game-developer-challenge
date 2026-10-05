@@ -8,6 +8,15 @@ interface ScoreboardProps {
 
 export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ isGameOver }) => {
   const { currentScore, setScreen } = useGameStore();
+  const openedFromPause = useGameStore((state) => state.openedFromPause);
+
+  const handleBack = () => {
+    if (openedFromPause) {
+      setScreen('paused');
+    } else {
+      setScreen('main_menu');
+    }
+  };
 
   return (
     <div className="overlay">
@@ -21,8 +30,21 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ isGameOver }) => {
 
         {/* Insere o miolo da tabela de forma limpa */}
         <RankingBoard />
-
-        <button className="primaryButton" onClick={() => setScreen('main_menu')}>Main Menu</button>
+        
+        {/* Botão de Retorno:
+          - Se aberto do pause: exibe somente o botão "Voltar" (para retornar ao pause).
+          - Se aberto do menu principal: exibe somente o botão "Voltar ao Menu".
+        */}
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          {openedFromPause ? (
+            <button className="primaryButton" onClick={handleBack}>Back</button>
+          ) : (
+            <div>
+              <button className="primaryButton" onClick={() => setScreen('main_menu')}>Main Menu</button>
+              <button className="primaryButton" onClick={() => setScreen('match_history')}>Match History</button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

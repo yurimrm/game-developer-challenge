@@ -22,8 +22,8 @@ export const RankingBoard: React.FC = () => {
           <thead>
             <tr>
               <th>Pos</th>
-              <th>Nome</th>
-              <th>Data</th>
+              <th>Capitain</th>
+              <th>Date</th>
               <th>Score</th>
             </tr>
           </thead>
@@ -31,7 +31,7 @@ export const RankingBoard: React.FC = () => {
             {currentRankings.length === 0 ? (
               <tr>
                 <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>
-                  Nenhum recorde registrado ainda.
+                  No Records yet.
                 </td>
               </tr>
             ) : (
@@ -53,25 +53,24 @@ export const RankingBoard: React.FC = () => {
 
       {/* Controles de Paginação */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
+        <div className='paginationHistory'>
           <button 
-            className="secondaryButton" 
+            className="buttonBg" 
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
           >
-            Anterior
+            <img src="/assets/ui/buttons/icon_turn_left.png" className='buttonImg' alt="Anterior" />
           </button>
-          <span>Página {currentPage} de {totalPages}</span>
+          <span className='textPagination'>Page {currentPage} de {totalPages}</span>
           <button 
-            className="secondaryButton" 
+            className="buttonBg" 
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
           >
-            Próxima
+            <img src="/assets/ui/buttons/icon_turn_right.png" className='buttonImg' alt="Próxima" />
           </button>
         </div>
       )}
-
     </div>
   );
 };
