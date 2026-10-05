@@ -151,13 +151,7 @@ export class Ship extends Container {
   }
 
   public accelerate(amount: number) {
-    this.speed = Math.max(this.minSpeed, Math.min(this.maxSpeed, this.speed + amount));
-
-    // Impede que a velocidade fique negativa (marcha ré) se não for desejado
-    if (this.speed < 0) {
-      this.speed = 0;
-    }
-    
+    this.speed = Math.max(this.minSpeed, Math.min(this.maxSpeed, this.speed + amount));   
   }
 
   public steer(direction: number) {

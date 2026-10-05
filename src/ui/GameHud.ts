@@ -19,8 +19,8 @@ export class GameHud {
   public static createPlayerHUD(app: Application, playerHp: number, playerMaxHp: number): PlayerHudElements {
     const playerHealthContainer = new Container();
     playerHealthContainer.zIndex = 1000; 
-    playerHealthContainer.x = 80;
-    playerHealthContainer.y = 30;
+    playerHealthContainer.x = 20;
+    playerHealthContainer.y = 20;
 
     const frameIcon = Texture.from('icon_heart');
     const frameTex = Texture.from('health_frame');
@@ -34,26 +34,26 @@ export class GameHud {
     iconSprite.width = 38;
     iconSprite.height = 38;
     iconSprite.anchor.set(0.0);
-    iconSprite.x = -60;
+    iconSprite.x = -10;
     iconSprite.y = -2;
 
     const frameSprite = new Sprite(frameTex);
     frameSprite.width = barWidth;
     frameSprite.height = barHeight;
     frameSprite.anchor.set(0.5);
-    frameSprite.x = 80;
+    frameSprite.x = 130;
     frameSprite.y = 15;
 
     const playerHealthBarFill = new Sprite(greenFillTex);
     playerHealthBarFill.width = playerMaxInternalWidth + 39;
     playerHealthBarFill.height = barHeight * 1.1;
     playerHealthBarFill.anchor.set(0, 0.5);
-    playerHealthBarFill.x = 60 - (playerMaxInternalWidth / 2);
+    playerHealthBarFill.x = 110 - (playerMaxInternalWidth / 2);
     playerHealthBarFill.y = 15;
 
     const maskGraphics = new Graphics();
     maskGraphics.rect(
-      80 - (playerMaxInternalWidth / 2), 
+      130 - (playerMaxInternalWidth / 2), 
       15 - (playerHealthBarFill.height / 2), 
       playerMaxInternalWidth, 
       playerHealthBarFill.height
@@ -67,7 +67,7 @@ export class GameHud {
       style: { fill: '#ffffff', fontSize: 12, align: 'center' }
     });
     playerHealthText.anchor.set(0.5); 
-    playerHealthText.x = 80;          
+    playerHealthText.x = 130;          
     playerHealthText.y = 15;          
 
     playerHealthContainer.addChild(iconSprite);
@@ -90,7 +90,8 @@ export class GameHud {
   public static createStatsHUD(app: Application): StatsHudElements {
     const statsContainer = new Container();
     statsContainer.zIndex = 1000;
-    statsContainer.x = (app.screen.width / 2) - 140; 
+    // Centralizado corretamente no topo com base na largura atual do ecrã
+    statsContainer.x = (app.screen.width / 2) - 150; 
     statsContainer.y = 20;
 
     const frameiconScore = Texture.from('icon_score');
@@ -101,13 +102,13 @@ export class GameHud {
     iconScore.width = 38;
     iconScore.height = 38;
     iconScore.anchor.set(0.0);
-    iconScore.x = 205;
+    iconScore.x = 0;
     iconScore.y = 2;
 
     const scorePanel = new Sprite(panelTexture);
-    scorePanel.width = 130;
+    scorePanel.width = 110;
     scorePanel.height = 45;
-    scorePanel.x = 240;
+    scorePanel.x = 35;
     scorePanel.y = 0;
 
     const scoreText = new Text({
@@ -122,13 +123,13 @@ export class GameHud {
     iconTime.width = 38;
     iconTime.height = 38;
     iconTime.anchor.set(0.0);
-    iconTime.x = 375;
+    iconTime.x = 160;
     iconTime.y = 2;
 
     const timerPanel = new Sprite(panelTexture);
-    timerPanel.width = 130;
+    timerPanel.width = 110;
     timerPanel.height = 45;
-    timerPanel.x = 410; 
+    timerPanel.x = 195; 
     timerPanel.y = 0;
 
     const timerText = new Text({

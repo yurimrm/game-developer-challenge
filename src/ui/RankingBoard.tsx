@@ -59,7 +59,7 @@ export const RankingBoard: React.FC = () => {
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
-                <img src="/assets/ui/buttons/icon_turn_left.png" className='buttonImg' alt="Anterior" />
+                <img src="assets/ui/buttons/icon_turn_left.png" className='buttonImg' alt="Anterior" />
               </button>
               <span className='textPagination'>Page {currentPage} de {totalPages}</span>
               <button 
@@ -67,7 +67,7 @@ export const RankingBoard: React.FC = () => {
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
               >
-                <img src="/assets/ui/buttons/icon_turn_right.png" className='buttonImg' alt="Próxima" />
+                <img src="assets/ui/buttons/icon_turn_right.png" className='buttonImg' alt="Próxima" />
               </button>
             </div>
           )}

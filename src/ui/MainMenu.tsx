@@ -1,6 +1,21 @@
 import React, { useState } from 'react';
 import { useGameStore } from './GameStore';
 
+export function requestFullScreenAndLandscape() {
+  const elem = document.documentElement;
+  
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen().catch(() => {});
+  } else if ((elem as any).webkitRequestFullscreen) {
+    (elem as any).webkitRequestFullscreen();
+  }
+
+  const orientation = screen.orientation as any;
+  if (orientation && orientation.lock) {
+    orientation.lock('landscape').catch(() => {});
+  }
+}
+
 export const MainMenu: React.FC = () => {
   const setScreen = useGameStore((state) => state.setScreen);
   const playerName = useGameStore((state) => state.playerName);
@@ -12,6 +27,8 @@ export const MainMenu: React.FC = () => {
     // Salva o nome antes de entrar na partida
     setPlayerName(nameInput);
     // Muda a tela para o jogo
+    // 1. Ativa a tela cheia e o modo paisagem
+    requestFullScreenAndLandscape();
     setScreen('playing');
   };
 
@@ -36,6 +53,12 @@ export const MainMenu: React.FC = () => {
           <button className="primaryButton" onClick={handleStartGame}>Play</button>
           <button className="primaryButton" onClick={() => setScreen('options')}>Options</button>
           <button className="primaryButton" onClick={() => setScreen('ranking')}>Ranking</button>
+        </div>
+
+        <div id="rotate-warning">
+          <img src="assets/ui/buttons/icon_restart.png" alt="Virar Celular" style={{ width: '64px', marginBottom: '16px', animation: 'bounce 1s infinite' }} />
+          <h2>Por favor, vire o seu celular!</h2>
+          <p>Este jogo foi desenhado para ser jogado no modo paisagem (horizontal).</p>
         </div>
         
       </div>

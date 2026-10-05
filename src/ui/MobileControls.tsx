@@ -99,7 +99,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           height: '50px',
         }}
       >
-        <img src="/assets/ui/buttons/icon_pause.png" className='buttonImg' alt="Pause" />
+        <img src="assets/ui/buttons/icon_pause.png" className='buttonImg' alt="Pause" />
       </button>
 
       {/* 🕹️ JOYSTICK VIRTUAL (Lado Esquerdo) */}
@@ -147,7 +147,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           onClick={onFireLeft}
           style={buttonStyle}
         >
-          <img src="/assets/ui/buttons/icon_fire_left.png" className='buttonImg' alt="Fire Left" />
+          <img src="assets/ui/buttons/icon_fire_left.png" className='buttonImg' alt="Fire Left" />
         </button>
 
         <button
@@ -155,7 +155,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           onClick={onFireFront}
           style={{ ...buttonStyle, width: '80px', height: '80px' }}
         >
-          <img src="/assets/ui/buttons/icon_fire_front.png" className='buttonImg' alt="Fire Front" />
+          <img src="assets/ui/buttons/icon_fire_front.png" className='buttonImg' alt="Fire Front" />
         </button>
 
         <button
@@ -163,7 +163,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           onClick={onFireRight}
           style={buttonStyle}
         >
-          <img src="/assets/ui/buttons/icon_fire_right.png" className='buttonImg' alt="Fire Right" />
+          <img src="assets/ui/buttons/icon_fire_right.png" className='buttonImg' alt="Fire Right" />
         </button>
       </div>
     </div>

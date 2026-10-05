@@ -137,7 +137,7 @@ h1 {
 }
 
 .primaryButton:hover {
-  background-image: url('../../public/assets/ui/buttons/button_primary_hover.png');
+  background-image: url('/assets/ui/buttons/button_primary_hover.png');
 }
 
 .formGroup { 
@@ -218,4 +218,29 @@ h1 {
   text-align: center;
   align-items: center;
   width: 100%;
+}
+
+/* No seu App.css ou arquivo de estilos */
+#rotate-warning {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000;
+  color: #fff;
+  z-index: 99999;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-family: sans-serif;
+}
+
+/* Mostra o aviso apenas se a tela for mais alta que larga (retrato) */
+@media screen and (orientation: portrait) {
+  #rotate-warning {
+    display: flex;
+  }
 }
