@@ -7,8 +7,12 @@ import { TileHelper } from '../core/TileHelper';
 import { TILE_COORDS } from '../core/TileMapConfig';
 import { AssetManager } from '../core/AssetManager';
 import { XMLAtlasLoader } from '../core/XMLAtlasLoader';
+import { useGameStore } from '../ui/GameStore';
 
 export class GameScene {
+  
+  private isPaused: boolean = false;
+  
   private app: Application;
   private worldContainer: Container;
   private myShip!: Ship;
@@ -82,6 +86,10 @@ export class GameScene {
     this.init();
   }
 
+  public setPaused(paused: boolean) {
+    this.isPaused = paused;
+  }
+
   private async init() {
     try {
       await AssetManager.getInstance().loadGameAssets();
@@ -122,6 +130,9 @@ export class GameScene {
       this.worldContainer.y = screenCenterY - this.myShip.y;
 
       this.app.ticker.add((ticker) => {
+        
+        if (this.isPaused) return;
+
         const delta = ticker.deltaTime;
 
         // --- ATUALIZAÇÃO DO CRONÔMETRO (TEMPO) ---
@@ -1109,13 +1120,22 @@ export class GameScene {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+
+    if (this.isPaused && e.code !== 'Escape') return;
+    
     if (this.keysPressed[e.code]) return; 
     this.keysPressed[e.code] = true;
 
     if (e.code === 'Space') {
       this.fireCannon();
     } 
-    else if (e.code === 'KeyQ') {
+    
+    if (e.code === 'Escape') {
+      // Altera a tela no Zustand para 'paused'
+      useGameStore.getState().setScreen('paused');
+    }
+
+    if (e.code === 'KeyQ') {
       // Usa o navio correto (this.myShip) e dispara para a esquerda
       this.firePlayerBroadside('left');
     } 

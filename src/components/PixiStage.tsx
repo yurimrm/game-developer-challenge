@@ -3,14 +3,29 @@ import React, { useEffect, useRef } from 'react';
 import { Application } from 'pixi.js';
 import { AssetManager } from '../core/AssetManager';
 import { GameScene } from '../scenes/GameScene';
+import { useGameStore } from '../ui/GameStore'; // 👈 Importa a store
 
-// Resolução de design base (Proporção 16:9)
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
 
 export const PixiStage: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
+  const sceneRef = useRef<GameScene | null>(null); // 👈 Referência para a cena
+  
+  // Pega o estado atual da tela do Zustand
+  const currentScreen = useGameStore((state) => state.currentScreen);
+
+  // Efeito para gerenciar o Pause/Play com base no Zustand
+  useEffect(() => {
+    if (sceneRef.current) {
+      if (currentScreen === 'paused') {
+        sceneRef.current.setPaused(true);
+      } else if (currentScreen === 'playing') {
+        sceneRef.current.setPaused(false);
+      }
+    }
+  }, [currentScreen]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -18,12 +33,11 @@ export const PixiStage: React.FC = () => {
     const initPixi = async () => {
       if (!containerRef.current) return;
 
-      // 1. Cria a instância da Aplicação PixiJS v8
       const app = new Application();
       appRef.current = app;
 
       await app.init({
-        resizeTo: window, // Faz o Pixi acompanhar o tamanho real da janela
+        resizeTo: window,
         backgroundColor: 0x111111,
         width: DESIGN_WIDTH,
         height: DESIGN_HEIGHT,
@@ -37,10 +51,8 @@ export const PixiStage: React.FC = () => {
         return;
       }
 
-      // Anexa o elemento canvas gerado pelo Pixi ao nosso container DOM
       containerRef.current.appendChild(app.canvas);
 
-      // 2. Carrega os Assets (Atlas XML e JSON) usando o AssetManager
       const assetManager = AssetManager.getInstance();
       try {
         await assetManager.loadGameAssets();
@@ -51,7 +63,6 @@ export const PixiStage: React.FC = () => {
 
       if (isCancelled) return;
 
-      // 3. Função de redimensionamento responsivo (Letterbox / Mantém proporção 16:9)
       const handleResize = () => {
         if (!containerRef.current || !appRef.current) return;
 
@@ -72,12 +83,14 @@ export const PixiStage: React.FC = () => {
       handleResize();
       window.addEventListener('resize', handleResize);
 
-      // 4. Inicializa a cena principal do jogo
-      const scene = new GameScene(app);
+      // Inicializa a cena principal e guarda na ref
+      sceneRef.current = new GameScene(app);
 
       return () => {
         window.removeEventListener('resize', handleResize);
-        scene.destroy();
+        if (sceneRef.current) {
+          sceneRef.current.destroy();
+        }
         app.destroy(true, { children: true });
       };
     };
