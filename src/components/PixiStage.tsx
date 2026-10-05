@@ -1,7 +1,7 @@
 // src/components/PixiStage.tsx
 import React, { useEffect, useRef } from 'react';
 import { Application } from 'pixi.js';
-import { AssetManager } from '../core/AssetManager';
+import { AssetManager } from '../managers/AssetManager';
 import { GameScene } from '../scenes/GameScene';
 import { useGameStore } from '../ui/GameStore';
 import { MobileControls } from '../ui/MobileControls';

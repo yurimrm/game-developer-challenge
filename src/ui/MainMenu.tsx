@@ -19,7 +19,7 @@ export const MainMenu: React.FC = () => {
     <div className="overlay_main">
       <div className="containerMenu">
         
-      <img src="/assets/ui/title_pirate_battle.png" alt="Pirate Battle" className='logo' />
+      <img src="assets/ui/title_pirate_battle.png" alt="Pirate Battle" className='logo' />
 
         <div className="optionField" style={{ margin: '20px 0' }}>
           <input 

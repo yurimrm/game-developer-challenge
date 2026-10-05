@@ -2,7 +2,7 @@
 import { Application, Container, Text, Assets, Texture } from 'pixi.js';
 import { Ship } from '../core/Ship';
 import { TileHelper } from '../core/TileHelper';
-import { AssetManager } from '../core/AssetManager';
+import { AssetManager } from '../managers/AssetManager';
 import { MapGenerator } from '../core/MapGenerator';
 import { CombatManager, CannonBall } from '../managers/CombatManager';
 import { EnemyManager, EnemyData } from '../managers/EnemyManager';
@@ -68,7 +68,7 @@ export class GameScene {
 
   private playSound(filename: string, volume: number = 0.5) {
     try {
-      const audio = new Audio(`/assets/sounds/${filename}`);
+      const audio = new Audio(`assets/sounds/${filename}`);
       audio.volume = volume;
       audio.play().catch(() => {});
     } catch (e) {}
@@ -79,7 +79,7 @@ export class GameScene {
       this.isGameOverTriggered = false;
 
       await AssetManager.getInstance().loadGameAssets();
-      TileHelper.init(Assets.get('/assets/tilesheet/tiles_sheet.png'));
+      TileHelper.init(Assets.get('assets/tilesheet/tiles_sheet.png'));
       this.isAssetsLoaded = true;
 
       this.myShip = new Ship('blue', 0);
