@@ -177,33 +177,44 @@ export class GameScene {
           this.spawnSingleEnemy();
         }
 
-        // Tratamento de Movimento (Joystick Direcional do Telemóvel)
+       // Verifica se alguma tecla do PC está a ser pressionada
+       const isPcActive = 
+          this.keysPressed['ArrowUp'] || this.keysPressed['KeyW'] || 
+          this.keysPressed['ArrowDown'] || this.keysPressed['KeyS'] || 
+          this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA'] || 
+          this.keysPressed['ArrowRight'] || this.keysPressed['KeyD'];
+
+        // --- TRATAMENTO DE MOVIMENTO (RESPEITANDO A FÍSICA DO BARCO) ---
         if (this.isMobileMoving && this.mobileInputAngle !== null) {
-          // A a apontar ativamente para o joystick
+          // 1. TELEMÓVEL: Calcula a diferença entre o joystick e a frente do barco
           let angleDiff = this.mobileInputAngle - this.myShip.rotation;
+          
+          // Normaliza o ângulo para encontrar o caminho mais rápido (-180 a 180 graus)
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          this.myShip.rotation += angleDiff * 0.2 * delta;
+          
+          // Usa o "leme" natural do barco em vez de forçar a rotação!
+          const deadZoneAngle = 0.08;
+          if (angleDiff > deadZoneAngle) {
+            this.myShip.steer(1);  // Gira o leme para a direita
+          } else if (angleDiff < -deadZoneAngle) {
+            this.myShip.steer(-1); // Gira o leme para a esquerda
+          }
 
+          // Acelera na direção que está a apontar
           this.myShip.accelerate(0.05 * delta);
-        } else if (!this.isMobileMoving && this.mobileInputAngle === null && !this.keysPressed['KeyW'] && !this.keysPressed['KeyS']) {
-          // 🚀 SOLTOU O JOYSTICK: Mantém o barco a deslizar na última direção guardada enquanto desacelera
-          let angleDiff = this.lastMobileAngle - this.myShip.rotation;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          this.myShip.rotation += angleDiff * 0.1 * delta; // Trajetória firme sem guinadas
-
-          this.myShip.speed *= 0.98; // Desaceleração suave
-        } else {
-          // Controles de Teclado tradicionais (PC)
+        } 
+        else if (isPcActive) {
+          // 2. PC: Controles de teclado tradicionais
           if (this.keysPressed['ArrowUp'] || this.keysPressed['KeyW']) this.myShip.accelerate(0.05 * delta);
           if (this.keysPressed['ArrowDown'] || this.keysPressed['KeyS']) this.myShip.accelerate(-0.05 * delta);
           if (this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA']) this.myShip.steer(-1);
           if (this.keysPressed['ArrowRight'] || this.keysPressed['KeyD']) this.myShip.steer(1);
-
-          if (!this.keysPressed['ArrowUp'] && !this.keysPressed['KeyW'] && !this.keysPressed['ArrowDown'] && !this.keysPressed['KeyS']) {
-            this.myShip.speed *= 0.98; 
-          }
+        } 
+        else {
+          // 3. INÉRCIA (Nenhum controle ativo)
+          // Apenas perde velocidade. Como não tocamos na rotação, o barco simplesmente desliza sem guinar!
+          this.myShip.speed *= 0.98;
         }
 
         const prevX = this.myShip.x;
