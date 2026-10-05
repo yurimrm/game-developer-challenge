@@ -136,8 +136,7 @@ export const PixiStage: React.FC = () => {
       {/* Controlos Mobile sobrepostos apenas quando o jogo estiver a rolar */}
       {currentScreen === 'playing' && (
         <MobileControls
-          onMove={(dir) => sceneRef.current?.setMobileMovement(dir)}
-          onSteer={(val) => sceneRef.current?.setMobileSteer(val)}
+          onJoystickMove={(angle, isMoving) => sceneRef.current?.setMobileJoystick(angle, isMoving)}
           onFireFront={() => sceneRef.current?.fireCannonMobile()}
           onFireLeft={() => sceneRef.current?.firePlayerBroadsideMobile('left')}
           onFireRight={() => sceneRef.current?.firePlayerBroadsideMobile('right')}

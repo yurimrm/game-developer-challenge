@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+// src/ui/MobileControls.tsx
+import React, { useState, useRef, useEffect } from 'react';
 
 interface MobileControlsProps {
-  onMove: (direction: 'forward' | 'backward' | 'stop') => void;
-  onSteer: (steer: number) => void; // -1 para esquerda, 1 para direita, 0 para centro
+  onJoystickMove: (angle: number | null, isMoving: boolean) => void;
   onFireFront: () => void;
   onFireLeft: () => void;
   onFireRight: () => void;
@@ -10,34 +10,33 @@ interface MobileControlsProps {
 }
 
 export const MobileControls: React.FC<MobileControlsProps> = ({
-  onMove,
-  onSteer,
+  onJoystickMove,
   onFireFront,
   onFireLeft,
   onFireRight,
   onPause,
 }) => {
-  
-  // Estados para o Joystick Simples
   const [touchPos, setTouchPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const joystickRef = useRef<HTMLDivElement>(null);
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
+  // Referências para controlar o toque globalmente
+  const touchIdRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isDragging) return;
+    const touch = e.changedTouches[0];
+    touchIdRef.current = touch.identifier;
     setIsDragging(true);
-    handleTouchMove(e);
+    updateJoystickPosition(touch.clientX, touch.clientY);
   };
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging && e.type !== 'touchstart' && e.type !== 'mousedown') return;
+  const updateJoystickPosition = (clientX: number, clientY: number) => {
     if (!joystickRef.current) return;
 
     const rect = joystickRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
     const dx = clientX - centerX;
     const dy = clientY - centerY;
@@ -49,26 +48,53 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
 
     setTouchPos({ x: limitedX, y: limitedY });
 
-    // Normaliza para o leme e aceleração
-    const steerVal = limitedX / (rect.width / 2); // -1 a 1
-    const moveVal = -limitedY / (rect.height / 2); // -1 (trás) a 1 (frente)
-
-    onSteer(steerVal);
-    if (moveVal > 0.3) {
-      onMove('forward');
-    } else if (moveVal < -0.3) {
-      onMove('backward');
+    const deadzone = 10;
+    if (Math.sqrt(dx * dx + dy * dy) > deadzone) {
+      onJoystickMove(angle, true);
     } else {
-      onMove('stop');
+      onJoystickMove(null, false);
     }
   };
 
-  const handleTouchEnd = () => {
-    setIsDragging(false);
-    setTouchPos({ x: 0, y: 0 });
-    onSteer(0);
-    onMove('stop');
-  };
+  // Efeito para escutar o movimento e o fim do toque em toda a janela (evita que o joystick "cole")
+  useEffect(() => {
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (!isDragging) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === touchIdRef.current) {
+          updateJoystickPosition(touch.clientX, touch.clientY);
+          break;
+        }
+      }
+    };
+
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      if (!isDragging) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === touchIdRef.current) {
+          setIsDragging(false);
+          setTouchPos({ x: 0, y: 0 });
+          touchIdRef.current = null;
+          onJoystickMove(null, false);
+          break;
+        }
+      }
+    };
+
+    if (isDragging) {
+      window.addEventListener('touchmove', handleGlobalTouchMove, { passive: true });
+      window.addEventListener('touchend', handleGlobalTouchEnd);
+      window.addEventListener('touchcancel', handleGlobalTouchEnd);
+    }
+
+    return () => {
+      window.removeEventListener('touchmove', handleGlobalTouchMove);
+      window.removeEventListener('touchend', handleGlobalTouchEnd);
+      window.removeEventListener('touchcancel', handleGlobalTouchEnd);
+    };
+  }, [isDragging]);
 
   return (
     <div style={{
@@ -77,7 +103,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       left: 0,
       width: '100%',
       height: '100%',
-      pointerEvents: 'none', // Deixa cliques passarem para o jogo onde não há botões
+      pointerEvents: 'none',
       zIndex: 9999,
       display: 'flex',
       justifyContent: 'space-between',
@@ -85,7 +111,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       padding: '50px',
       boxSizing: 'border-box',
     }}>
-      {/* ⏸️ BOTÃO DE PAUSE (Topo Direito absoluto) */}
+      {/* ⏸️ BOTÃO DE PAUSE */}
       <button
         className='buttonBg'
         onClick={onPause}
@@ -102,15 +128,10 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
         <img src="assets/ui/buttons/icon_pause.png" className='buttonImg' alt="Pause" />
       </button>
 
-      {/* 🕹️ JOYSTICK VIRTUAL (Lado Esquerdo) */}
+      {/* 🕹️ JOYSTICK VIRTUAL LIVRE (Lado Esquerdo) */}
       <div
         ref={joystickRef}
         onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onMouseDown={handleTouchStart}
-        onMouseMove={handleTouchMove}
-        onMouseUp={handleTouchEnd}
         style={{
           pointerEvents: 'auto',
           width: '120px',
@@ -135,16 +156,17 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
         }} />
       </div>
 
-      {/* 🎯 BOTÕES DE DISPARO (Lado Direito) */}
+      {/* 🎯 BOTÕES DE DISPARO INDEPENDENTES (Lado Direito) */}
       <div style={{
         pointerEvents: 'auto',
         display: 'flex',
         gap: '5px',
         alignItems: 'flex-end',
+        touchAction: 'none',
       }}>
         <button
           className='buttonBg'
-          onClick={onFireLeft}
+          onTouchStart={(e) => { e.stopPropagation(); onFireLeft(); }}
           style={buttonStyle}
         >
           <img src="assets/ui/buttons/icon_fire_left.png" className='buttonImg' alt="Fire Left" />
@@ -152,7 +174,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
 
         <button
           className='buttonBg'
-          onClick={onFireFront}
+          onTouchStart={(e) => { e.stopPropagation(); onFireFront(); }}
           style={{ ...buttonStyle, width: '80px', height: '80px' }}
         >
           <img src="assets/ui/buttons/icon_fire_front.png" className='buttonImg' alt="Fire Front" />
@@ -160,7 +182,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
 
         <button
           className='buttonBg'
-          onClick={onFireRight}
+          onTouchStart={(e) => { e.stopPropagation(); onFireRight(); }}
           style={buttonStyle}
         >
           <img src="assets/ui/buttons/icon_fire_right.png" className='buttonImg' alt="Fire Right" />

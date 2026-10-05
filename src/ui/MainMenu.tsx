@@ -45,7 +45,7 @@ export const MainMenu: React.FC = () => {
             onChange={(e) => setNameInput(e.target.value)} 
             placeholder="Captain's Name"
             maxLength={15}
-            style={{ padding: '8px', fontSize: '16px', borderRadius: '4px', border: '1px solid #ccc' }}
+            style={{ textAlign:'center', padding: '8px', fontSize: '16px', borderRadius: '4px', border: '1px solid #ccc' }}
           />
         </div>
         

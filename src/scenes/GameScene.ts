@@ -39,6 +39,10 @@ export class GameScene {
   private playerMaxInternalWidth: number = 165;
   private playerHealthText!: Text;
 
+  private mobileInputAngle: number | null = null;
+  private isMobileMoving: boolean = false;
+  private lastMobileAngle: number = 0;
+
   private lastShotTime: number = 0;
   private shootCooldown: number = 300; // Milissegundos entre cada tiro (ajuste se quiser mais lento/rápido)
 
@@ -173,13 +177,33 @@ export class GameScene {
           this.spawnSingleEnemy();
         }
 
-        if (this.keysPressed['ArrowUp'] || this.keysPressed['KeyW']) this.myShip.accelerate(0.05 * delta);
-        if (this.keysPressed['ArrowDown'] || this.keysPressed['KeyS']) this.myShip.accelerate(-0.05 * delta);
-        if (this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA']) this.myShip.steer(-1);
-        if (this.keysPressed['ArrowRight'] || this.keysPressed['KeyD']) this.myShip.steer(1);
+        // Tratamento de Movimento (Joystick Direcional do Telemóvel)
+        if (this.isMobileMoving && this.mobileInputAngle !== null) {
+          // A a apontar ativamente para o joystick
+          let angleDiff = this.mobileInputAngle - this.myShip.rotation;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          this.myShip.rotation += angleDiff * 0.2 * delta;
 
-        if (!this.keysPressed['ArrowUp'] && !this.keysPressed['KeyW'] && !this.keysPressed['ArrowDown'] && !this.keysPressed['KeyS']) {
-          this.myShip.speed *= 0.98; 
+          this.myShip.accelerate(0.05 * delta);
+        } else if (!this.isMobileMoving && this.mobileInputAngle === null && !this.keysPressed['KeyW'] && !this.keysPressed['KeyS']) {
+          // 🚀 SOLTOU O JOYSTICK: Mantém o barco a deslizar na última direção guardada enquanto desacelera
+          let angleDiff = this.lastMobileAngle - this.myShip.rotation;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          this.myShip.rotation += angleDiff * 0.1 * delta; // Trajetória firme sem guinadas
+
+          this.myShip.speed *= 0.98; // Desaceleração suave
+        } else {
+          // Controles de Teclado tradicionais (PC)
+          if (this.keysPressed['ArrowUp'] || this.keysPressed['KeyW']) this.myShip.accelerate(0.05 * delta);
+          if (this.keysPressed['ArrowDown'] || this.keysPressed['KeyS']) this.myShip.accelerate(-0.05 * delta);
+          if (this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA']) this.myShip.steer(-1);
+          if (this.keysPressed['ArrowRight'] || this.keysPressed['KeyD']) this.myShip.steer(1);
+
+          if (!this.keysPressed['ArrowUp'] && !this.keysPressed['KeyW'] && !this.keysPressed['ArrowDown'] && !this.keysPressed['KeyS']) {
+            this.myShip.speed *= 0.98; 
+          }
         }
 
         const prevX = this.myShip.x;
@@ -548,18 +572,34 @@ export class GameScene {
     }
   }
 
-  public setMobileMovement(dir: 'forward' | 'backward' | 'stop') {
-    this.keysPressed['KeyW'] = dir === 'forward';
-    this.keysPressed['KeyS'] = dir === 'backward';
+  // Novo controle direcional livre (o ângulo vem direto do joystick virtual)
+  public setMobileJoystick(angle: number | null, isMoving: boolean) {
+    this.isMobileMoving = isMoving;
+    this.mobileInputAngle = angle;
+
+    if (angle !== null) {
+      this.lastMobileAngle = angle; // Guarda sempre a última direção apontada
+    }
+
+    if (!isMoving) {
+      this.keysPressed['KeyW'] = false;
+      this.keysPressed['KeyS'] = false;
+      this.keysPressed['KeyA'] = false;
+      this.keysPressed['KeyD'] = false;
+      this.keysPressed['ArrowUp'] = false;
+      this.keysPressed['ArrowDown'] = false;
+      this.keysPressed['ArrowLeft'] = false;
+      this.keysPressed['ArrowRight'] = false;
+    }
   }
 
-  public setMobileSteer(steer: number) {
-    this.keysPressed['KeyA'] = steer < -0.2;
-    this.keysPressed['KeyD'] = steer > 0.2;
+  public fireCannonMobile() { 
+    this.fireCannon(); 
   }
 
-  public fireCannonMobile() { this.fireCannon(); }
-  public firePlayerBroadsideMobile(side: 'left' | 'right') { this.firePlayerBroadside(side); }
+  public firePlayerBroadsideMobile(side: 'left' | 'right') { 
+    this.firePlayerBroadside(side); 
+  }
 
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.isPaused && e.code !== 'Escape') return;
