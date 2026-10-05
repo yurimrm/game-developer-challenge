@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Pirate Game E2E Tests', () => {
   test('Deve carregar a página inicial e iniciar o jogo', async ({ page }) => {
     // Acede à aplicação
-    await page.goto('http://localhost:5173');
+    await page.goto('https://martuccelli.com.br/pirate/');
 
     // Tenta encontrar e clicar no botão de iniciar se ele existir, aguardando um pouco por ele
     const startButton = page.locator('button:has-text("Play"), button:has-text("Jogar")');
