@@ -6,6 +6,7 @@ interface MobileControlsProps {
   onFireFront: () => void;
   onFireLeft: () => void;
   onFireRight: () => void;
+  onPause: () => void;
 }
 
 export const MobileControls: React.FC<MobileControlsProps> = ({
@@ -14,7 +15,9 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
   onFireFront,
   onFireLeft,
   onFireRight,
+  onPause,
 }) => {
+  
   // Estados para o Joystick Simples
   const [touchPos, setTouchPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -82,6 +85,23 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       padding: '100px',
       boxSizing: 'border-box',
     }}>
+      {/* ⏸️ BOTÃO DE PAUSE (Topo Direito absoluto) */}
+      <button
+        className='buttonBg'
+        onClick={onPause}
+        style={{
+          ...buttonStyle,
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          pointerEvents: 'auto',
+          width: '50px',
+          height: '50px',
+        }}
+      >
+        <img src="/assets/ui/buttons/icon_pause.png" className='buttonImg' alt="Pause" />
+      </button>
+
       {/* 🕹️ JOYSTICK VIRTUAL (Lado Esquerdo) */}
       <div
         ref={joystickRef}
@@ -127,7 +147,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           onClick={onFireLeft}
           style={buttonStyle}
         >
-          <img src="/assets/ui/buttons/icon_fire_left.png" className='buttonImg' />
+          <img src="/assets/ui/buttons/icon_fire_left.png" className='buttonImg' alt="Fire Left" />
         </button>
 
         <button
@@ -135,7 +155,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           onClick={onFireFront}
           style={{ ...buttonStyle, width: '80px', height: '80px' }}
         >
-          <img src="/assets/ui/buttons/icon_fire_front.png" className='buttonImg' />
+          <img src="/assets/ui/buttons/icon_fire_front.png" className='buttonImg' alt="Fire Front" />
         </button>
 
         <button
@@ -143,7 +163,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           onClick={onFireRight}
           style={buttonStyle}
         >
-          <img src="/assets/ui/buttons/icon_fire_right.png" className='buttonImg' />
+          <img src="/assets/ui/buttons/icon_fire_right.png" className='buttonImg' alt="Fire Right" />
         </button>
       </div>
     </div>

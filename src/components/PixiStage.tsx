@@ -136,6 +136,7 @@ export const PixiStage: React.FC = () => {
           onFireFront={() => sceneRef.current?.fireCannonMobile()}
           onFireLeft={() => sceneRef.current?.firePlayerBroadsideMobile('left')}
           onFireRight={() => sceneRef.current?.firePlayerBroadsideMobile('right')}
+          onPause={() => useGameStore.getState().setScreen('paused')}
         />
       )}
     </div>

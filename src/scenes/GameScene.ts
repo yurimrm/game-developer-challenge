@@ -807,7 +807,7 @@ export class GameScene {
       if (distanceToPlayer < minDistanceFromPlayer) continue;
 
       const enemyType: 'shooter' | 'kamikaze' = Math.random() < 0.5 ? 'kamikaze' : 'shooter';
-      const enemyShip = new Ship(enemyType === 'kamikaze' ? 'red' : 'blue', 0);
+      const enemyShip = new Ship(enemyType === 'kamikaze' ? 'pirate' : 'red', 0);
       enemyShip.x = posX;
       enemyShip.y = posY;
       enemyShip.rotation = Math.random() * Math.PI * 2;
@@ -946,13 +946,13 @@ export class GameScene {
     iconScore.width = 38;
     iconScore.height = 38;
     iconScore.anchor.set(0.0);
-    iconScore.x = 175;
+    iconScore.x = 205;
     iconScore.y = 2;
 
     const scorePanel = new Sprite(panelTexture);
     scorePanel.width = 130;
     scorePanel.height = 45;
-    scorePanel.x = 210;
+    scorePanel.x = 240;
     scorePanel.y = 0;
 
     this.scoreText = new Text({
@@ -967,13 +967,13 @@ export class GameScene {
     iconTime.width = 38;
     iconTime.height = 38;
     iconTime.anchor.set(0.0);
-    iconTime.x = 345;
+    iconTime.x = 375;
     iconTime.y = 2;
 
     const timerPanel = new Sprite(panelTexture);
     timerPanel.width = 130;
     timerPanel.height = 45;
-    timerPanel.x = 380; 
+    timerPanel.x = 410; 
     timerPanel.y = 0;
 
     this.timerText = new Text({

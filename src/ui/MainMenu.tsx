@@ -16,7 +16,7 @@ export const MainMenu: React.FC = () => {
   };
 
   return (
-    <div className="overlay">
+    <div className="overlay_main">
       <div className="containerMenu">
         
       <img src="/assets/ui/title_pirate_battle.png" alt="Pirate Battle" className='logo' />
