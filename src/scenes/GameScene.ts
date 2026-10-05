@@ -12,6 +12,7 @@ import { useGameStore } from '../ui/GameStore';
 export class GameScene {
   
   private isPaused: boolean = false;
+  private isGameOver: boolean = false;
   
   private app: Application;
   private worldContainer: Container;
@@ -131,7 +132,20 @@ export class GameScene {
 
       this.app.ticker.add((ticker) => {
         
+
+        // --- MENU DE PAUSE ---
         if (this.isPaused) return;
+
+        // --- CONDIÇÃO DE GAME OVER ---
+        if (this.playerHp <= 0 || this.remainingTime <= 0) {
+          this.isGameOver = true;
+          // Atualiza o score e o tempo restante usando o método que você já tem na store
+          useGameStore.getState().setCurrentGameStats(this.score, this.remainingTime);
+          
+          // Altera a tela global para game_over
+          useGameStore.getState().setScreen('game_over');
+          return;
+        }
 
         const delta = ticker.deltaTime;
 
@@ -1130,7 +1144,7 @@ export class GameScene {
       this.fireCannon();
     } 
     
-    if (e.code === 'Escape') {
+    if (e.code === 'Escape' && this.isGameOver === false) {
       // Altera a tela no Zustand para 'paused'
       useGameStore.getState().setScreen('paused');
     }

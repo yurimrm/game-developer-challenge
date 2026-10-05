@@ -12,7 +12,7 @@ export function App() {
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      {(currentScreen === 'playing' || currentScreen === 'paused') && (
+      {(currentScreen === 'playing' || currentScreen === 'paused' || currentScreen === 'game_over') && (
         <PixiStage />
       )}
 
