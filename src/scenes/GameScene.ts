@@ -94,6 +94,24 @@ export class GameScene {
 
   public setPaused(paused: boolean) {
     this.isPaused = paused;
+    if (paused) {
+      this.playSound('game_pause.wav');
+    } else {
+      this.playSound('game_resume.wav');
+    }
+  }
+
+  // --- FUNÇÃO AUXILIAR DE ÁUDIO ---
+  private playSound(filename: string, volume: number = 0.5) {
+    try {
+      const audio = new Audio(`/assets/sounds/${filename}`);
+      audio.volume = volume;
+      audio.play().catch(() => {
+        // Ignora restrições de autoplay do browser antes da primeira interação
+      });
+    } catch (e) {
+      // Falha silenciosa
+    }
   }
 
   private async init() {
@@ -119,6 +137,8 @@ export class GameScene {
       this.createPlayerHUD();
       this.createStatsHUD();
 
+      this.playSound('game_start.wav', 0.6);
+
       this.infoText = new Text({
         text: 'Carregando dados de depuração...',
         style: { fill: '#000', fontSize: 14, align: 'left' }
@@ -136,13 +156,9 @@ export class GameScene {
       this.worldContainer.x = screenCenterX - this.myShip.x;
       this.worldContainer.y = screenCenterY - this.myShip.y;
 
-      // Exemplo de uso ao finalizar a partida:
       const handleGameOverSubmission = async (playerName:string, score:number, timeSurvived:any, enemiesDefeated:number) => {
         try {
-          // 1. Pega o token (simulado ou real)
           const token = await pirateApi.login(playerName);
-          
-          // 2. Salva a partida enviando o token JWT no cabeçalho
           await pirateApi.saveMatchRecord({
             playerName,
             score,
@@ -163,6 +179,7 @@ export class GameScene {
         // --- CONDIÇÃO DE GAME OVER ---
         if ((this.playerHp <= 0 || this.remainingTime <= 0) && !this.isGameOverTriggered) {
           this.isGameOverTriggered = true;
+          this.playSound('game_over.wav', 0.7);
 
           const { playerName, matchDuration } = useGameStore.getState();
           const timeLeft = this.remainingTime;
@@ -290,6 +307,7 @@ export class GameScene {
               if (distToEnemy < 35) {
                 enemyData.hp -= 25;
                 this.createExplosion(ball.sprite.x, ball.sprite.y);
+                this.playSound('ship_wood_hit_1.wav');
 
                 this.worldContainer.removeChild(ball.sprite);
                 ball.sprite.destroy();
@@ -297,6 +315,7 @@ export class GameScene {
                 projectileDestroyed = true;
 
                 if (enemyData.hp <= 0) {
+                  this.playSound('ship_sinking.wav');
                   this.worldContainer.removeChild(enemyData.ship);
                   enemyData.ship.destroy();
 
@@ -306,6 +325,7 @@ export class GameScene {
                   this.enemies.splice(j, 1);
                   
                   this.score += 1;
+                  this.playSound('score_point.wav');
                   if (this.scoreText) {
                     this.scoreText.text = `${this.score}`;
                   }
@@ -321,6 +341,7 @@ export class GameScene {
             if (distToPlayer < 30) {
               this.playerHp = Math.max(0, this.playerHp - 15);
               this.createExplosion(ball.sprite.x, ball.sprite.y);
+              this.playSound('ship_wood_hit_2.wav');
 
               this.worldContainer.removeChild(ball.sprite);
               ball.sprite.destroy();
@@ -358,13 +379,14 @@ export class GameScene {
 
           if (ball.landTilesPenetrated >= maxLandPenetration || ball.distanceTraveled > maxDistance) {
             this.createExplosion(ball.sprite.x, ball.sprite.y);
+            this.playSound('cannonball_water_hit_1.wav', 0.4);
             this.worldContainer.removeChild(ball.sprite);
             ball.sprite.destroy();
             this.cannonBalls.splice(i, 1);
           }
         }
         
-        // --- IA DOS INIMIGOS (CORRIGIDA: COLISÃO, EVITASÃO SÓLIDA E CONTORNO SUAVE) ---
+        // --- IA DOS INIMIGOS ---
         for (let j = this.enemies.length - 1; j >= 0; j--) {
           const enemyData = this.enemies[j];
           const enemy = enemyData.ship;
@@ -390,17 +412,14 @@ export class GameScene {
             enemyData.healthBarFill.texture = newTex;
           }
 
-          // ==========================================
-          // 1. PRIORIDADE MÁXIMA: KAMIKAZE (EXPLOSÃO AO ENCOSTAR)
-          // ==========================================
           if (enemyData.type === 'kamikaze') {
             const kamikazeDetectionRange = 700; 
-            const explosionTouchRange = 45; // Distância exata para detonar
+            const explosionTouchRange = 45; 
 
-            // Se encostar no jogador, explode imediatamente (sempre checado primeiro)
             if (distToPlayer <= explosionTouchRange) {
               this.playerHp = Math.max(0, this.playerHp - 25);
               this.createExplosion(enemy.x, enemy.y);
+              this.playSound('ship_explosion_1.wav', 0.8);
 
               this.worldContainer.removeChild(enemy);
               enemy.destroy();
@@ -432,9 +451,6 @@ export class GameScene {
               targetSpeed = 1.8;
             }
           } 
-          // ==========================================
-          // 2. COMPORTAMENTO DE ATIRADOR (SHOOTER)
-          // ==========================================
           else {
             if (enemyData.escapeTimer > 0) {
               enemyData.escapeTimer -= delta;
@@ -483,12 +499,11 @@ export class GameScene {
             }
           }
 
-          // Atualiza velocidade e movimento preliminar
           enemy.speed += (targetSpeed - enemy.speed) * 0.08 * delta;
           enemy.update(delta);         
           
           const lookAheadDistance = 60;
-          const sideOffsetAngle = 0.5; // Ângulo para os raios laterais (cerca de ~30 graus)
+          const sideOffsetAngle = 0.5;
 
           const aheadX = enemy.x + Math.cos(enemy.rotation) * lookAheadDistance;
           const aheadY = enemy.y + Math.sin(enemy.rotation) * lookAheadDistance;
@@ -520,9 +535,9 @@ export class GameScene {
               enemyData.escapeTimer = 40;
               
               if (hitLeft && !hitRight) {
-                enemyData.avoidanceDirection = 1; // Direita
+                enemyData.avoidanceDirection = 1;
               } else if (hitRight && !hitLeft) {
-                enemyData.avoidanceDirection = -1; // Esquerda
+                enemyData.avoidanceDirection = -1;
               } else {
                 enemyData.avoidanceDirection = Math.random() > 0.5 ? 1 : -1;
               }
@@ -539,9 +554,26 @@ export class GameScene {
               enemyData.avoidanceDirection = undefined;
             }
           }
-          // ==========================================
 
-          // Proteção de bordas do mapa (continua logo abaixo...)
+          const enemyTileX = Math.floor(enemy.x / this.tileSize);
+          const enemyTileY = Math.floor(enemy.y / this.tileSize);
+          const eGridX = enemyTileX - this.mapOriginTileX;
+          const eGridY = enemyTileY - this.mapOriginTileY;
+
+          let isCurrentlyOnLand = false;
+          if (eGridX >= 0 && eGridX < width && eGridY >= 0 && eGridY < width) {
+            if (this.currentGrid[eGridX]?.[eGridY] === 'land') {
+              isCurrentlyOnLand = true;
+            }
+          }
+
+          if (isCurrentlyOnLand) {
+            enemy.x = prevEnemyX;
+            enemy.y = prevEnemyY;
+            enemy.speed = -1.0; 
+            enemy.rotation += 0.5; 
+          }
+
           const mapMargin = 40;
           const mapMinXLimit = this.mapMinX + mapMargin;
           const mapMaxXLimit = this.mapMaxX - mapMargin;
@@ -554,7 +586,6 @@ export class GameScene {
             enemy.rotation += Math.PI;
           }
 
-          // Colisão física com o jogador para atiradores
           const collisionDistance = 45; 
           if (distToPlayer < collisionDistance && enemyData.type !== 'kamikaze') {
             enemy.x = prevEnemyX;
@@ -564,6 +595,7 @@ export class GameScene {
             this.myShip.x = prevX;
             this.myShip.y = prevY;
             this.myShip.speed = -this.myShip.speed * 0.5;
+            this.playSound('ship_collision.wav');
           }
         }
 
@@ -651,6 +683,8 @@ export class GameScene {
     const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
     if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
 
+    this.playSound('cannon_broadside.wav', 0.7);
+
     const sideOffset = side === 'left' ? -Math.PI / 2 : Math.PI / 2;
     const baseRotation = this.myShip.rotation + sideOffset;
     const spreadAngles = [ -Math.PI / 22, 0, Math.PI / 22 ];
@@ -692,6 +726,10 @@ export class GameScene {
     const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
     if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
 
+    const fireSounds = ['cannon_fire_1.wav', 'cannon_fire_2.wav', 'cannon_fire_3.wav'];
+    const randomFireSound = fireSounds[Math.floor(Math.random() * fireSounds.length)];
+    this.playSound(randomFireSound, 0.6);
+
     const ballSprite = new Sprite(cannonTexture);
     ballSprite.anchor.set(0.5);
     ballSprite.width = 10;
@@ -724,6 +762,8 @@ export class GameScene {
 
     const cannonTexture = XMLAtlasLoader.getTexture('cannon_ball.png');
     if (!cannonTexture || cannonTexture === Texture.EMPTY) return;
+
+    this.playSound('cannon_fire_1.wav', 0.4);
 
     const ballSprite = new Sprite(cannonTexture);
     ballSprite.anchor.set(0.5);
@@ -1231,7 +1271,6 @@ export class GameScene {
   }
 
   public setMobileSteer(steer: number) {
-    // steer vai de -1 (esquerda) a 1 (direita)
     this.keysPressed['KeyA'] = steer < -0.2;
     this.keysPressed['KeyD'] = steer > 0.2;
   }
