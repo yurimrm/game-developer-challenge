@@ -16,9 +16,7 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ isGameOver }) => {
         <h2>CAPITAIN'S LOG</h2>
 
         {isGameOver && (
-          <p style={{ marginBottom: '15px', fontSize: '18px' }}>
-            Sua Pontuação Nesta Partida: <strong>{currentScore} pontos</strong>
-          </p>
+          <p className='gameOvertext'>Sua pontuação nessa partida foi: <strong>{currentScore} pontos</strong></p>
         )}
 
         {/* Insere o miolo da tabela de forma limpa */}

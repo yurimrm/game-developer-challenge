@@ -45,7 +45,8 @@ export class GameScene {
 
   // Sistema de Jogo (Pontuação e Tempo)
   private score: number = 0;
-  private remainingTime: number = 180; // 180 segundos iniciais
+  private remainingTime: number = useGameStore.getState().matchDuration; // Pega a duração configurada nas Opções
+  private maxAllowedEnemies: number = useGameStore.getState().maxEnemies; // Pega o limite máximo de inimigos
   private timeElapsedAccumulator: number = 0; 
   private scoreText!: Text;
   private timerText!: Text;
@@ -138,11 +139,14 @@ export class GameScene {
 
         // --- CONDIÇÃO DE GAME OVER ---
         if (this.playerHp <= 0 || this.remainingTime <= 0) {
-          this.isGameOver = true;
-          // Atualiza o score e o tempo restante usando o método que você já tem na store
-          useGameStore.getState().setCurrentGameStats(this.score, this.remainingTime);
+          // Pega o nome e o score atuais da store
+          const { playerName } = useGameStore.getState();
           
-          // Altera a tela global para game_over
+          // Adiciona ao ranking persistido
+          useGameStore.getState().addRanking(playerName, this.score);
+          
+          // Atualiza as estatísticas e muda para a tela de game over
+          useGameStore.getState().setCurrentGameStats(this.score, this.remainingTime);
           useGameStore.getState().setScreen('game_over');
           return;
         }
@@ -171,7 +175,7 @@ export class GameScene {
         }
 
         // --- SISTEMA DE RESPAWN AUTOMÁTICO DE INIMIGOS ---
-        if (this.enemies.length < 4) {
+        if (this.enemies.length < this.maxAllowedEnemies) {
           if (Math.random() < 0.02) { 
             this.spawnSingleEnemy();
           }
@@ -779,11 +783,11 @@ export class GameScene {
 
   private spawnEnemies() {
     if (!this.isAssetsLoaded) return;
-    const numberOfEnemies = 4;
+    const numberOfEnemies = useGameStore.getState().maxEnemies; // Respeita o limite escolhido
     for (let i = 0; i < numberOfEnemies; i++) {
       this.spawnSingleEnemy();
     }
-    console.log(`${numberOfEnemies} navios inimigos gerados com barras de vida!`);
+    console.log(`${numberOfEnemies} navios inimigos gerados com base nas opções!`);
   }
 
   private createPlayerHUD() {
@@ -1138,13 +1142,12 @@ export class GameScene {
     if (this.isPaused && e.code !== 'Escape') return;
     
     if (this.keysPressed[e.code]) return; 
+    
     this.keysPressed[e.code] = true;
 
-    if (e.code === 'Space') {
-      this.fireCannon();
-    } 
+    if (e.code === 'Space') { this.fireCannon(); } 
     
-    if (e.code === 'Escape' && this.isGameOver === false) {
+    if (e.code === 'Escape' && this.isGameOver === false) { 
       // Altera a tela no Zustand para 'paused'
       useGameStore.getState().setScreen('paused');
     }
@@ -1153,10 +1156,12 @@ export class GameScene {
       // Usa o navio correto (this.myShip) e dispara para a esquerda
       this.firePlayerBroadside('left');
     } 
-    else if (e.code === 'KeyE') {
+
+    if (e.code === 'KeyE') {
       // Usa o navio correto (this.myShip) e dispara para a direita
       this.firePlayerBroadside('right');
     }
+
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
