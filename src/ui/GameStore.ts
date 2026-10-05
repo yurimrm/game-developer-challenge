@@ -48,6 +48,18 @@ interface GameState {
   matchHistory: MatchRecord[];
   addMatchRecord: (record: Omit<MatchRecord, 'id' | 'date'>) => void;
 
+  playerHp: number;
+  playerMaxHp: number;
+  setPlayerHp: (hp: number) => void;
+  
+  score: number;
+  setScore: (score: number) => void;
+
+  remainingTime: number;
+  setRemainingTime: (time: number) => void;
+  
+  resetGameStats: (duration: number) => void;
+
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -169,4 +181,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ matchHistory: updatedHistory });
     localStorage.setItem('pirate_match_history', JSON.stringify(updatedHistory));
   },
+
+  playerHp: 100,
+  playerMaxHp: 100,
+  setPlayerHp: (hp) => set({ playerHp: hp }),
+
+  score: 0,
+  setScore: (score) => set({ score }),
+
+  remainingTime: 180,
+  setRemainingTime: (time) => set({ remainingTime: time }),
+
+  resetGameStats: (duration) => set({
+    playerHp: 100,
+    score: 0,
+    remainingTime: duration,
+  }),
 }));

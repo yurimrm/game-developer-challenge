@@ -2,6 +2,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 interface MobileControlsProps {
+  playerHp: number;
+  playerMaxHp: number;
+  score: number;
+  remainingTime: number; // em segundos
   onJoystickMove: (angle: number | null, isMoving: boolean) => void;
   onFireFront: () => void;
   onFireLeft: () => void;
@@ -10,6 +14,10 @@ interface MobileControlsProps {
 }
 
 export const MobileControls: React.FC<MobileControlsProps> = ({
+  playerHp,
+  playerMaxHp,
+  score,
+  remainingTime,
   onJoystickMove,
   onFireFront,
   onFireLeft,
@@ -19,8 +27,6 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
   const [touchPos, setTouchPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const joystickRef = useRef<HTMLDivElement>(null);
-
-  // Referências para controlar o toque globalmente
   const touchIdRef = useRef<number | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -56,7 +62,6 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
     }
   };
 
-  // Efeito para escutar o movimento e o fim do toque em toda a janela (evita que o joystick "cole")
   useEffect(() => {
     const handleGlobalTouchMove = (e: TouchEvent) => {
       if (!isDragging) return;
@@ -96,6 +101,11 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
     };
   }, [isDragging]);
 
+  const hpPercentage = Math.max(0, Math.min(100, (playerHp / playerMaxHp) * 100));
+  const minutes = Math.floor(remainingTime / 60);
+  const seconds = remainingTime % 60;
+  const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
   return (
     <div style={{
       position: 'absolute',
@@ -106,95 +116,155 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       pointerEvents: 'none',
       zIndex: 9999,
       display: 'flex',
+      flexDirection: 'column',
       justifyContent: 'space-between',
-      alignItems: 'flex-end',
-      padding: '50px',
+      padding: '25px 40px',
       boxSizing: 'border-box',
     }}>
-      {/* ⏸️ BOTÃO DE PAUSE */}
-      <button
-        className='buttonBg'
-        onClick={onPause}
-        style={{
-          ...buttonStyle,
-          position: 'absolute',
-          top: '20px',
-          right: '20px',
-          pointerEvents: 'auto',
-          width: '50px',
-          height: '50px',
-        }}
-      >
-        <img src="assets/ui/buttons/icon_pause.png" className='buttonImg' alt="Pause" />
-      </button>
+      {/* --- TOPO: HUD DE VIDA, PLACAR, TEMPO E PAUSE --- */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        pointerEvents: 'auto',
+      }}>
+        {/* Esquerda: Barra de Vida + Placar + Tempo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+          
+          {/* Barra de Vida */}
+          <div className='healthBar'>
+            <img src="assets/ui/hud/icon_heart.png" alt="Heart" className='healthIcon' />
+            <div className='barraVida'>
+              <div style={{
+                width: `${hpPercentage}%`,
+                height: '100%',
+                backgroundColor: hpPercentage >= 75 ? '#2ecc71' : hpPercentage >= 30 ? '#f1c40f' : '#e74c3c',
+                transition: 'width 0.2s ease, background-color 0.3s ease',
+              }} />
+              <span style={{
+                position: 'absolute',
+                top: 10,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                fontSize: '16px',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontFamily: 'sans-serif',
+                textAlign: 'center',
+                lineHeight: '18px',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+              }}>
+                {Math.round(playerHp)} / {playerMaxHp}
+              </span>
+            </div>
+          </div>
 
-      {/* 🕹️ JOYSTICK VIRTUAL LIVRE (Lado Esquerdo) */}
-      <div
-        ref={joystickRef}
-        onTouchStart={handleTouchStart}
-        style={{
-          pointerEvents: 'auto',
-          width: '120px',
-          height: '120px',
-          borderRadius: '50%',
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          border: '2px solid rgba(255, 255, 255, 0.5)',
-          position: 'relative',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          touchAction: 'none',
-        }}
-      >
-        <div style={{
-          width: '50px',
-          height: '50px',
-          borderRadius: '50%',
-          backgroundColor: 'rgba(255, 255, 255, 0.7)',
-          transform: `translate(${touchPos.x}px, ${touchPos.y}px)`,
-          transition: isDragging ? 'none' : 'transform 0.1s ease',
-        }} />
+          {/* Placar (Score) */}
+          <div className='scoreBar'>
+            <img src="assets/ui/hud/icon_score.png" alt="Score" className='scoreIcon' />
+            <span>{score}</span>
+          </div>
+
+          {/* Temporizador */}
+          <div className='timeBar'>
+            <img src="assets/ui/hud/icon_time.png" alt="Time" className='timeIcon' />
+            <span>{formattedTime}</span>
+          </div>
+
+        </div>
+
+        {/* Direita: Botão de Pause */}
+        <button
+          className='buttonBg'
+          onClick={onPause}
+          style={{
+            ...buttonStyle,
+            width: '45px',
+            height: '45px',
+          }}
+        >
+          <img src="assets/ui/buttons/icon_pause.png" className='buttonImg' alt="Pause" />
+        </button>
       </div>
 
-      {/* 🎯 BOTÕES DE DISPARO INDEPENDENTES (Lado Direito) */}
+      {/* --- PARTE INFERIOR: JOYSTICK E BOTÕES DE TIRO --- */}
       <div style={{
-        pointerEvents: 'auto',
         display: 'flex',
-        gap: '5px',
+        justifyContent: 'space-between',
         alignItems: 'flex-end',
-        touchAction: 'none',
+        width: '100%',
+        pointerEvents: 'none',
       }}>
-        <button
-          className='buttonBg'
-          onTouchStart={(e) => { e.stopPropagation(); onFireLeft(); }}
-          style={buttonStyle}
+        {/* 🕹️ JOYSTICK VIRTUAL LIVRE (Lado Esquerdo) */}
+        <div
+          ref={joystickRef}
+          onTouchStart={handleTouchStart}
+          style={{
+            pointerEvents: 'auto',
+            width: '120px',
+            height: '120px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            border: '2px solid rgba(255, 255, 255, 0.5)',
+            position: 'relative',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            touchAction: 'none',
+          }}
         >
-          <img src="assets/ui/buttons/icon_fire_left.png" className='buttonImg' alt="Fire Left" />
-        </button>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            transform: `translate(${touchPos.x}px, ${touchPos.y}px)`,
+            transition: isDragging ? 'none' : 'transform 0.1s ease',
+          }} />
+        </div>
 
-        <button
-          className='buttonBg'
-          onTouchStart={(e) => { e.stopPropagation(); onFireFront(); }}
-          style={{ ...buttonStyle, width: '80px', height: '80px' }}
-        >
-          <img src="assets/ui/buttons/icon_fire_front.png" className='buttonImg' alt="Fire Front" />
-        </button>
+        {/* 🎯 BOTÕES DE DISPARO INDEPENDENTES (Lado Direito) */}
+        <div style={{
+          pointerEvents: 'auto',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'flex-end',
+          touchAction: 'none',
+        }}>
+          <button
+            className='buttonBg'
+            onTouchStart={(e) => { e.stopPropagation(); onFireLeft(); }}
+            style={buttonStyle}
+          >
+            <img src="assets/ui/buttons/icon_fire_left.png" className='buttonImg' alt="Fire Left" />
+          </button>
 
-        <button
-          className='buttonBg'
-          onTouchStart={(e) => { e.stopPropagation(); onFireRight(); }}
-          style={buttonStyle}
-        >
-          <img src="assets/ui/buttons/icon_fire_right.png" className='buttonImg' alt="Fire Right" />
-        </button>
+          <button
+            className='buttonBg'
+            onTouchStart={(e) => { e.stopPropagation(); onFireFront(); }}
+            style={{ ...buttonStyle, width: '75px', height: '75px' }}
+          >
+            <img src="assets/ui/buttons/icon_fire_front.png" className='buttonImg' alt="Fire Front" />
+          </button>
+
+          <button
+            className='buttonBg'
+            onTouchStart={(e) => { e.stopPropagation(); onFireRight(); }}
+            style={buttonStyle}
+          >
+            <img src="assets/ui/buttons/icon_fire_right.png" className='buttonImg' alt="Fire Right" />
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
 const buttonStyle: React.CSSProperties = {
-  width: '60px',
-  height: '60px',
+  width: '55px',
+  height: '55px',
   borderRadius: '50%',
   color: 'white',
   fontWeight: 'bold',

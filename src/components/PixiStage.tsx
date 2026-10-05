@@ -14,7 +14,12 @@ export const PixiStage: React.FC = () => {
   const appRef = useRef<Application | null>(null);
   const sceneRef = useRef<GameScene | null>(null);
   
+  // 🔹 Chamadas de hooks sempre no topo do componente de forma consistente
   const currentScreen = useGameStore((state) => state.currentScreen);
+  const playerHp = useGameStore((state) => state.playerHp);
+  const playerMaxHp = useGameStore((state) => state.playerMaxHp);
+  const score = useGameStore((state) => state.score);
+  const remainingTime = useGameStore((state) => state.remainingTime);
 
   useEffect(() => {
     if (sceneRef.current) {
@@ -35,7 +40,6 @@ export const PixiStage: React.FC = () => {
       const app = new Application();
       appRef.current = app;
 
-      // Inicializamos sem o resizeTo para gerenciar o letterbox manualmente com precisão total
       await app.init({
         backgroundColor: 0x111111,
         width: DESIGN_WIDTH,
@@ -68,14 +72,12 @@ export const PixiStage: React.FC = () => {
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
 
-        // O renderer preenche a janela inteira
         app.renderer.resize(windowWidth, windowHeight);
 
         const scaleX = windowWidth / DESIGN_WIDTH;
         const scaleY = windowHeight / DESIGN_HEIGHT;
-        const scale = Math.min(scaleX, scaleY);
+        const scale = Math.max(scaleX, scaleY);
 
-        // Escala e centraliza o stage perfeitamente sem cortes nas pontas
         app.stage.scale.set(scale);
         app.stage.x = (windowWidth - DESIGN_WIDTH * scale) / 2;
         app.stage.y = (windowHeight - DESIGN_HEIGHT * scale) / 2;
@@ -136,6 +138,10 @@ export const PixiStage: React.FC = () => {
       {/* Controlos Mobile sobrepostos apenas quando o jogo estiver a rolar */}
       {currentScreen === 'playing' && (
         <MobileControls
+          playerHp={playerHp}
+          playerMaxHp={playerMaxHp}
+          score={score}
+          remainingTime={remainingTime}
           onJoystickMove={(angle, isMoving) => sceneRef.current?.setMobileJoystick(angle, isMoving)}
           onFireFront={() => sceneRef.current?.fireCannonMobile()}
           onFireLeft={() => sceneRef.current?.firePlayerBroadsideMobile('left')}

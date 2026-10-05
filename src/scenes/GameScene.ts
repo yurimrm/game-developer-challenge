@@ -6,7 +6,6 @@ import { AssetManager } from '../managers/AssetManager';
 import { MapGenerator } from '../core/MapGenerator';
 import { CombatManager, CannonBall } from '../managers/CombatManager';
 import { EnemyManager, EnemyData } from '../managers/EnemyManager';
-import { GameHud } from '../ui/GameHud';
 import { useGameStore } from '../ui/GameStore';
 import { pirateApi } from '../service/apiService';
 
@@ -18,11 +17,11 @@ export class GameScene {
   private worldContainer: Container;
   private myShip!: Ship;
   private keysPressed: Record<string, boolean> = {};
-  private infoText?: Text;
   private isAssetsLoaded: boolean = false;
 
   private tileSize: number = 64;
   private radiusInTiles: number = 30;
+
   private currentGrid: ('deep' | 'shallow' | 'land')[][] = [];
   private mapOriginTileX: number = 0;
   private mapOriginTileY: number = 0;
@@ -50,7 +49,6 @@ export class GameScene {
   private maxAllowedEnemies: number = useGameStore.getState().maxEnemies; 
   private timeElapsedAccumulator: number = 0; 
   private scoreText!: Text;
-  private timerText!: Text;
 
   private cannonBalls: CannonBall[] = [];
   private enemies: EnemyData[] = [];
@@ -85,6 +83,12 @@ export class GameScene {
       TileHelper.init(Assets.get('assets/tilesheet/tiles_sheet.png'));
       this.isAssetsLoaded = true;
 
+      const matchDur = useGameStore.getState().matchDuration;
+      useGameStore.getState().resetGameStats(matchDur);
+      this.playerHp = 100;
+      this.score = 0;
+      this.remainingTime = matchDur;
+
       this.myShip = new Ship('blue', 0);
       this.myShip.x = 1000;
       this.myShip.y = 1000; 
@@ -103,25 +107,7 @@ export class GameScene {
 
       this.worldContainer.addChild(this.myShip);
 
-      const pHud = GameHud.createPlayerHUD(this.app, this.playerHp, this.playerMaxHp);
-      this.playerHealthBarFill = pHud.healthBarFill;
-      this.playerHealthMask = pHud.healthMask;
-      this.playerHealthText = pHud.healthText;
-      this.playerMaxInternalWidth = pHud.maxInternalWidth;
-
-      const sHud = GameHud.createStatsHUD(this.app);
-      this.scoreText = sHud.scoreText;
-      this.timerText = sHud.timerText;
-
       this.playSound('game_start.wav', 0.6);
-
-      this.infoText = new Text({
-        text: 'Carregando dados de depuração...',
-        style: { fill: '#ffffff', fontSize: 14, align: 'left' }
-      });
-      this.infoText.x = 20;
-      this.infoText.y = 80; 
-      this.app.stage.addChild(this.infoText);
 
       window.addEventListener('keydown', this.onKeyDown);
       window.addEventListener('keyup', this.onKeyUp);
@@ -166,9 +152,7 @@ export class GameScene {
           if (this.timeElapsedAccumulator >= 1000) {
             this.remainingTime -= 1;
             this.timeElapsedAccumulator -= 1000;
-          }
-          if (this.timerText) {
-            this.timerText.text = `${String(Math.floor(this.remainingTime / 60)).padStart(2, '0')}:${String(this.remainingTime % 60).padStart(2, '0')}`;
+            useGameStore.getState().setRemainingTime(this.remainingTime); // ⏱️ Atualiza store
           }
         }
 
@@ -277,6 +261,8 @@ export class GameScene {
                   this.enemies.splice(j, 1);
                   
                   this.score += 1;
+                  useGameStore.getState().setScore(this.score);
+
                   this.playSound('score_point.wav');
                   if (this.scoreText) this.scoreText.text = `${this.score}`;
                 }
@@ -289,7 +275,9 @@ export class GameScene {
             const distToPlayer = Math.sqrt(dx * dx + dy * dy);
 
             if (distToPlayer < 30) {
+              
               this.playerHp = Math.max(0, this.playerHp - 15);
+              useGameStore.getState().setPlayerHp(this.playerHp);
               CombatManager.createExplosion(this.worldContainer, ball.sprite.x, ball.sprite.y);
               this.playSound('ship_wood_hit_2.wav');
 
@@ -403,8 +391,12 @@ export class GameScene {
           else {
             // --- MOVIMENTO NORMAL (SEM OBSTÁCULOS PRÓXIMOS) ---
             if (enemyData.type === 'kamikaze') {
+              
               if (distToPlayer <= 45) {
+                
                 this.playerHp = Math.max(0, this.playerHp - 25);
+
+                useGameStore.getState().setPlayerHp(this.playerHp);
                 CombatManager.createExplosion(this.worldContainer, enemy.x, enemy.y);
                 this.playSound('ship_explosion_1.wav', 0.8);
 
@@ -491,21 +483,6 @@ export class GameScene {
           this.worldContainer.sortChildren();
         }
 
-        let enemyInfoText = '';
-        this.enemies.forEach((enemyData, index) => {
-          enemyInfoText += `Inimigo ${index + 1} [${enemyData.type}] (${enemyData.state}) -> HP: ${enemyData.hp}\n`;
-        });
-
-        if (this.infoText) {
-          this.infoText.text = 
-            `Controles:\n` +
-            `[W/S] Acelerar | [A/D] Leme | [Espaço] Atirar\n` +
-            `---------------------------\n` +
-            `HP do Jogador: ${this.playerHp}/${this.playerMaxHp}\n` +
-            `Inimigos Ativos: ${this.enemies.length}\n` +
-            enemyInfoText;
-        }
-
         const stageScaleX = this.app.stage.scale.x;
         const stageScaleY = this.app.stage.scale.y;
         const currentCenterX = (this.app.renderer.width / stageScaleX) / 2;
@@ -516,8 +493,8 @@ export class GameScene {
         const screenWidth = this.app.renderer.width / stageScaleX;
         const screenHeight = this.app.renderer.height / stageScaleY;
 
-        targetX = Math.max(screenWidth - this.mapMaxX, Math.min(-this.mapMinX, targetX));
-        targetY = Math.max(screenHeight - this.mapMaxY, Math.min(-this.mapMinY, targetY));
+        targetX = Math.min(-this.mapMinX, Math.max(screenWidth - this.mapMaxX, targetX));
+        targetY = Math.min(-this.mapMinY, Math.max(screenHeight - this.mapMaxY, targetY));
 
         this.worldContainer.x += (targetX - this.worldContainer.x) * 0.1;
         this.worldContainer.y += (targetY - this.worldContainer.y) * 0.1;
