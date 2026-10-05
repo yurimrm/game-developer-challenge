@@ -9,6 +9,8 @@ import { AssetManager } from '../core/AssetManager';
 import { XMLAtlasLoader } from '../core/XMLAtlasLoader';
 import { useGameStore } from '../ui/GameStore';
 
+import { pirateApi } from '../service/apiService';
+
 export class GameScene {
   
   private isPaused: boolean = false;
@@ -134,6 +136,26 @@ export class GameScene {
       this.worldContainer.x = screenCenterX - this.myShip.x;
       this.worldContainer.y = screenCenterY - this.myShip.y;
 
+      // Exemplo de uso ao finalizar a partida:
+      const handleGameOverSubmission = async (playerName:string, score:number, timeSurvived:any, enemiesDefeated:number) => {
+        try {
+          // 1. Pega o token (simulado ou real)
+          const token = await pirateApi.login(playerName);
+          
+          // 2. Salva a partida enviando o token JWT no cabeçalho
+          await pirateApi.saveMatchRecord({
+            playerName,
+            score,
+            timeSurvived,
+            enemiesDefeated
+          }, token);
+
+          console.log("Dados sincronizados com o backend com sucesso!");
+        } catch (err) {
+          console.error("Erro na comunicação com o backend:", err);
+        }
+      };
+
       this.app.ticker.add((ticker) => {
         
         if (this.isPaused) return;
@@ -157,10 +179,12 @@ export class GameScene {
             enemiesDefeated: this.score, 
           });
 
-          useGameStore.getState().addRanking(playerName, this.score);
+          handleGameOverSubmission(playerName, this.score, timeFormatted, this.score);
 
+          useGameStore.getState().addRanking(playerName, this.score);
           useGameStore.getState().setCurrentGameStats(this.score, timeLeft);
           useGameStore.getState().setScreen('game_over');
+          
           return;
         }
 

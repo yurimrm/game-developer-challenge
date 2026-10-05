@@ -197,3 +197,9 @@ h1 {
   font-size: 13pt;
   font-style: italic;
 }
+
+.alignCenter {
+  text-align: center;
+  align-items: center;
+  width: 100%;
+}

@@ -13,7 +13,7 @@ export const MatchHistoryBoard: React.FC = () => {
 
   // Estados para controle da paginação baseada nos registros filtrados
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 6;
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;

@@ -6,7 +6,7 @@ export const RankingBoard: React.FC = () => {
 
   // Estados para controle da paginação
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 6;
 
   // Cálculos da paginação
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -49,28 +49,32 @@ export const RankingBoard: React.FC = () => {
             )}
           </tbody>
         </table>
+        
+        <div className="alignCenter">
+          {/* Controles de Paginação */}
+          {totalPages > 1 && (
+            <div className='paginationHistory'>
+              <button 
+                className="buttonBg" 
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <img src="/assets/ui/buttons/icon_turn_left.png" className='buttonImg' alt="Anterior" />
+              </button>
+              <span className='textPagination'>Page {currentPage} de {totalPages}</span>
+              <button 
+                className="buttonBg" 
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                <img src="/assets/ui/buttons/icon_turn_right.png" className='buttonImg' alt="Próxima" />
+              </button>
+            </div>
+          )}
+        </div>
+
       </div>
 
-      {/* Controles de Paginação */}
-      {totalPages > 1 && (
-        <div className='paginationHistory'>
-          <button 
-            className="buttonBg" 
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            <img src="/assets/ui/buttons/icon_turn_left.png" className='buttonImg' alt="Anterior" />
-          </button>
-          <span className='textPagination'>Page {currentPage} de {totalPages}</span>
-          <button 
-            className="buttonBg" 
-            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            <img src="/assets/ui/buttons/icon_turn_right.png" className='buttonImg' alt="Próxima" />
-          </button>
-        </div>
-      )}
-    </div>
+      </div>
   );
 };
