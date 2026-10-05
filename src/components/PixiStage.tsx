@@ -3,7 +3,8 @@ import React, { useEffect, useRef } from 'react';
 import { Application } from 'pixi.js';
 import { AssetManager } from '../core/AssetManager';
 import { GameScene } from '../scenes/GameScene';
-import { useGameStore } from '../ui/GameStore'; // 👈 Importa a store
+import { useGameStore } from '../ui/GameStore';
+import { MobileControls } from '../ui/MobileControls';
 
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
@@ -11,12 +12,10 @@ const DESIGN_HEIGHT = 720;
 export const PixiStage: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
-  const sceneRef = useRef<GameScene | null>(null); // 👈 Referência para a cena
+  const sceneRef = useRef<GameScene | null>(null);
   
-  // Pega o estado atual da tela do Zustand
   const currentScreen = useGameStore((state) => state.currentScreen);
 
-  // Efeito para gerenciar o Pause/Play com base no Zustand
   useEffect(() => {
     if (sceneRef.current) {
       if (currentScreen === 'paused') {
@@ -83,7 +82,6 @@ export const PixiStage: React.FC = () => {
       handleResize();
       window.addEventListener('resize', handleResize);
 
-      // Inicializa a cena principal e guarda na ref
       sceneRef.current = new GameScene(app);
 
       return () => {
@@ -108,11 +106,7 @@ export const PixiStage: React.FC = () => {
 
   return (
     <div 
-      ref={containerRef} 
       style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center',
         width: '100vw',
         height: '100vh',
         overflow: 'hidden',
@@ -120,7 +114,30 @@ export const PixiStage: React.FC = () => {
         top: 0,
         left: 0,
         backgroundColor: '#000000'
-      }} 
-    />
+      }}
+    >
+      {/* Container do Canvas PixiJS */}
+      <div 
+        ref={containerRef} 
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          width: '100%',
+          height: '100%',
+        }} 
+      />
+
+      {/* Controlos Mobile sobrepostos apenas quando o jogo estiver a rolar */}
+      {currentScreen === 'playing' && (
+        <MobileControls
+          onMove={(dir) => sceneRef.current?.setMobileMovement(dir)}
+          onSteer={(val) => sceneRef.current?.setMobileSteer(val)}
+          onFireFront={() => sceneRef.current?.fireCannonMobile()}
+          onFireLeft={() => sceneRef.current?.firePlayerBroadsideMobile('left')}
+          onFireRight={() => sceneRef.current?.firePlayerBroadsideMobile('right')}
+        />
+      )}
+    </div>
   );
 };
