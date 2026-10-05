@@ -6,22 +6,22 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
 
 ---
 ### 🗺️ Próximas Etapas & Roadmap
-* [ ] Ajustes para Responsividade
-* [ ] Persistência de ranking com LocalStorage ou backend simples.
-* [ ] Match History
-* [ ] Menu Options funcional
-* [ ] Telas de Gameover e Pause
-* [ ] Novos tipos de inimigos (Chaser / Boss).
+* [ ] Testes com Playwright
 * [ ] Editor de Mapas com UI
 * [ ] Efeitos sonoros e trilha sonora pirata customizada.
 * [ ] Power-ups espalhados pelo mapa (reparação de casco e tiro triplo).
 * [ ] Boss
 * [ ] Animações
-* [ ] Testes com Playwright
 
 ---
 
 ## 🚀 Funcionalidades e Recursos Implementados
+* [x] Ajustes para Responsividade
+* [x] Persistência de ranking com LocalStorage ou backend simples.
+* [x] Match History
+* [x] Menu Options funcional
+* [x] Telas de Gameover e Pause
+* [x] Novos tipos de inimigos (Chaser / Boss).
 
 ### 🎮 Motor de Jogo & Física (`PixiJS` / `Core`)
 * **Estrutura Modular:** Separação clara entre a lógica do motor (`src/core/`) e a interface (`src/ui/`).
@@ -33,6 +33,7 @@ O projeto foi estruturado de forma modular para isolar a física e a renderizaç
   * Comportamento de fuga/desvio de ilhas para evitar colisões estáticas.
 * **Sistema de Combate:** Mecânica de disparos frontais e controle de dano/vida para o jogador e embarcações inimigas.
 * **Gerenciador de Spawn:** Sistema dinâmico configurável para controle de taxa de surgimento (*respawn rate*) e limite máximo de inimigos simultâneos.
+* **2 modos de ataques - Frontal e Lateral implementados
 
 ### 🖥️ Interface & Menus (`React` + `Zustand`)
 * **Gerenciamento de Estado Global:** Utilização do Zustand para controle fluído de telas, modais e opções.
