@@ -163,8 +163,6 @@ export class GameScene {
           return;
         }
 
-        console.log(this.myShip);
-
         if (this.isGameOverTriggered) return;
         const delta = ticker.deltaTime;
         this.floatTimer += delta * 0.1;
@@ -271,17 +269,28 @@ export class GameScene {
           this.trails.push({ sprite: rightTrail, life: 1.0, maxLife: 1.0 });
         }
 
-        // --- COLISÃO RIGOROSA COM AS BORDAS DO MAPA ---
-        const margin = 30; 
-        const rightBoundary = this.mapMaxX;
+        const stageScaleX = this.app.stage.scale.x;
+        const stageScaleY = this.app.stage.scale.y;
+        const screenWidth = this.app.renderer.width / stageScaleX;
+        const screenHeight = this.app.renderer.height / stageScaleY;
 
-        if (this.myShip.x < this.mapMinX + margin || 
-            this.myShip.x > rightBoundary - margin || 
-            this.myShip.y < this.mapMinY + margin || 
-            this.myShip.y > this.mapMaxY - margin) {
+        // --- 2. COLISÃO PROPORCIONAL À ÁREA VISÍVEL ---
+        const paddingX = screenWidth * 0.08; // 8% de margem interna segura nas laterais
+        const paddingY = screenHeight * 0.08; // 8% de margem interna segura no topo/fundo
+
+        const minXLimit = this.mapMinX + paddingX;
+        const maxXLimit = this.mapMaxX - paddingX;
+        const minYLimit = this.mapMinY + paddingY;
+        const maxYLimit = this.mapMaxY - paddingY;
+        const shipRadius = 25; 
+
+        if (this.myShip.x < minXLimit + shipRadius || 
+            this.myShip.x > maxXLimit - shipRadius || 
+            this.myShip.y < minYLimit + shipRadius || 
+            this.myShip.y > maxYLimit - shipRadius) {
           this.myShip.x = prevX;
           this.myShip.y = prevY;
-          this.myShip.speed = -this.myShip.speed * 0.5; 
+          this.myShip.speed = -this.myShip.speed * 0.4; 
         }
 
         const shipTileX = Math.floor(this.myShip.x / this.tileSize);
@@ -596,21 +605,18 @@ export class GameScene {
           this.worldContainer.sortChildren();
         }
 
-        // --- CÂMARA E CORREÇÃO FINAL DA BORDA PRETA ---
-        const stageScaleX = this.app.stage.scale.x;
-        const stageScaleY = this.app.stage.scale.y;
-        const currentCenterX = (this.app.renderer.width / stageScaleX) / 2;
-        const currentCenterY = (this.app.renderer.height / stageScaleY) / 2;
+        // --- CÂMARA COM AJUSTE PARA ELIMINAR A BORDA PRETA NA DIREITA ---
+        const currentCenterX = screenWidth / 2;
+        const currentCenterY = screenHeight / 2;
 
         let targetX = currentCenterX - this.myShip.x;
         let targetY = currentCenterY - this.myShip.y;
-        const screenWidth = this.app.renderer.width / stageScaleX;
-        const screenHeight = this.app.renderer.height / stageScaleY;
 
-        const minCameraX = screenWidth - this.mapMaxX; 
-        const maxCameraX = 0;
+        // Adicionamos um deslocamento extra (-180) no minCameraX para puxar o mapa para a esquerda e tapar o preto
+        const minCameraX = (screenWidth - this.mapMaxX) + 180; 
+        const maxCameraX = -this.mapMinX;
         const minCameraY = screenHeight - this.mapMaxY;
-        const maxCameraY = 0;
+        const maxCameraY = -this.mapMinY;
 
         targetX = Math.min(maxCameraX, Math.max(minCameraX, targetX));
         targetY = Math.min(maxCameraY, Math.max(minCameraY, targetY));
