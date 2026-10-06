@@ -1,6 +1,6 @@
 // src/scenes/GameScene.ts
-import { Application, Container, Text, Assets, Texture } from 'pixi.js';
-import { Ship } from '../core/Ship';
+import { Application, Container, Assets, Texture, Sprite, Graphics } from 'pixi.js';
+import { DamageLevel, Ship } from '../core/Ship';
 import { TileHelper } from '../core/TileHelper';
 import { AssetManager } from '../managers/AssetManager';
 import { MapGenerator } from '../core/MapGenerator';
@@ -8,6 +8,12 @@ import { CombatManager, CannonBall } from '../managers/CombatManager';
 import { EnemyManager, EnemyData } from '../managers/EnemyManager';
 import { useGameStore } from '../ui/GameStore';
 import { pirateApi } from '../service/apiService';
+
+interface TrailParticle {
+  sprite: Sprite;
+  life: number;
+  maxLife: number;
+}
 
 export class GameScene {
   private isPaused: boolean = false;
@@ -33,25 +39,28 @@ export class GameScene {
 
   private playerMaxHp: number = 100;
   private playerHp: number = 100;
-  private playerHealthBarFill!: any;
-  private playerHealthMask!: any;
-  private playerMaxInternalWidth: number = 165;
-  private playerHealthText!: Text;
-
+  private currentPlayerTier: DamageLevel = 0;
+  
   private mobileInputAngle: number | null = null;
   private isMobileMoving: boolean = false;
 
   private lastShotTime: number = 0;
-  private shootCooldown: number = 300; // Milissegundos entre cada tiro (ajuste se quiser mais lento/rápido)
+  private shootCooldown: number = 300; 
 
   private score: number = 0;
   private remainingTime: number = useGameStore.getState().matchDuration; 
   private maxAllowedEnemies: number = useGameStore.getState().maxEnemies; 
   private timeElapsedAccumulator: number = 0; 
-  private scoreText!: Text;
 
   private cannonBalls: CannonBall[] = [];
   private enemies: EnemyData[] = [];
+  
+  private trails: TrailParticle[] = [];
+  private particleTexture!: Texture;
+  
+  private playerHitFlashTimer: number = 0;
+  private cameraShakeTimer: number = 0;
+  private floatTimer: number = 0;
 
   constructor(app: Application) {
     this.app = app;
@@ -59,7 +68,16 @@ export class GameScene {
     this.worldContainer.sortableChildren = true;
     this.app.stage.addChild(this.worldContainer);
 
+    this.initParticleTexture();
     this.init();
+  }
+
+  private initParticleTexture() {
+    const graphics = new Graphics();
+    graphics.circle(0, 0, 4); 
+    graphics.fill(0xffffff);
+    this.particleTexture = this.app.renderer.generateTexture(graphics);
+    graphics.destroy();
   }
 
   public setPaused(paused: boolean) {
@@ -88,6 +106,7 @@ export class GameScene {
       this.playerHp = 100;
       this.score = 0;
       this.remainingTime = matchDur;
+      this.currentPlayerTier = 0;
 
       this.myShip = new Ship('blue', 0);
       this.myShip.x = 1000;
@@ -144,15 +163,18 @@ export class GameScene {
           return;
         }
 
+        console.log(this.myShip);
+
         if (this.isGameOverTriggered) return;
         const delta = ticker.deltaTime;
+        this.floatTimer += delta * 0.1;
 
         if (this.remainingTime > 0) {
           this.timeElapsedAccumulator += ticker.deltaMS;
           if (this.timeElapsedAccumulator >= 1000) {
             this.remainingTime -= 1;
             this.timeElapsedAccumulator -= 1000;
-            useGameStore.getState().setRemainingTime(this.remainingTime); // ⏱️ Atualiza store
+            useGameStore.getState().setRemainingTime(this.remainingTime);
           }
         }
 
@@ -160,43 +182,49 @@ export class GameScene {
           this.spawnSingleEnemy();
         }
 
-       // Verifica se alguma tecla do PC está a ser pressionada
-       const isPcActive = 
+        const playerHpPct = this.playerHp / this.playerMaxHp;
+        const desiredPlayerTier: DamageLevel = playerHpPct < 0.3 ? 2 : playerHpPct < 0.75 ? 1 : 0;
+        if (this.currentPlayerTier !== desiredPlayerTier) {
+          this.currentPlayerTier = desiredPlayerTier;
+          this.myShip.setDamage(desiredPlayerTier);
+        }
+
+        if (this.playerHitFlashTimer > 0) {
+          this.playerHitFlashTimer -= delta;
+          this.myShip.tint = 0xff2222; 
+        } else {
+          this.myShip.tint = 0xffffff; 
+        }
+
+        const floatOffset = Math.sin(this.floatTimer) * 2.5;
+        this.myShip.y += floatOffset * 0.05;
+
+        const isPcActive = 
           this.keysPressed['ArrowUp'] || this.keysPressed['KeyW'] || 
           this.keysPressed['ArrowDown'] || this.keysPressed['KeyS'] || 
           this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA'] || 
           this.keysPressed['ArrowRight'] || this.keysPressed['KeyD'];
 
-        // --- TRATAMENTO DE MOVIMENTO (RESPEITANDO A FÍSICA DO BARCO) ---
         if (this.isMobileMoving && this.mobileInputAngle !== null) {
-          // 1. TELEMÓVEL: Calcula a diferença entre o joystick e a frente do barco
           let angleDiff = this.mobileInputAngle - this.myShip.rotation;
-          
-          // Normaliza o ângulo para encontrar o caminho mais rápido (-180 a 180 graus)
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
           
-          // Usa o "leme" natural do barco em vez de forçar a rotação!
           const deadZoneAngle = 0.08;
           if (angleDiff > deadZoneAngle) {
-            this.myShip.steer(1);  // Gira o leme para a direita
+            this.myShip.steer(1);
           } else if (angleDiff < -deadZoneAngle) {
-            this.myShip.steer(-1); // Gira o leme para a esquerda
+            this.myShip.steer(-1);
           }
-
-          // Acelera na direção que está a apontar
           this.myShip.accelerate(0.05 * delta);
         } 
         else if (isPcActive) {
-          // 2. PC: Controles de teclado tradicionais
           if (this.keysPressed['ArrowUp'] || this.keysPressed['KeyW']) this.myShip.accelerate(0.05 * delta);
           if (this.keysPressed['ArrowDown'] || this.keysPressed['KeyS']) this.myShip.accelerate(-0.05 * delta);
           if (this.keysPressed['ArrowLeft'] || this.keysPressed['KeyA']) this.myShip.steer(-1);
           if (this.keysPressed['ArrowRight'] || this.keysPressed['KeyD']) this.myShip.steer(1);
         } 
         else {
-          // 3. INÉRCIA (Nenhum controle ativo)
-          // Apenas perde velocidade. Como não tocamos na rotação, o barco simplesmente desliza sem guinar!
           this.myShip.speed *= 0.98;
         }
 
@@ -204,8 +232,53 @@ export class GameScene {
         const prevY = this.myShip.y;
         this.myShip.update(delta);
 
-        const margin = 40; 
-        if (this.myShip.x < this.mapMinX + margin || this.myShip.x > this.mapMaxX - margin || this.myShip.y < this.mapMinY + margin || this.myShip.y > this.mapMaxY - margin) {
+        // --- RASTRO EM "V" FINO E LIGEIRAMENTE INCLINADO ---
+        if (Math.abs(this.myShip.speed) > 0.2) {
+          const sternX = this.myShip.x + Math.cos(this.myShip.rotation + Math.PI) * 18;
+          const sternY = this.myShip.y + Math.sin(this.myShip.rotation + Math.PI) * 18;
+
+          const sideOffset = 8;
+          const perpAngle = this.myShip.rotation + Math.PI / 2;
+          const skewAngle = 0.35; 
+
+          const leftX = sternX + Math.cos(perpAngle) * sideOffset + Math.cos(this.myShip.rotation - skewAngle) * 4;
+          const leftY = sternY + Math.sin(perpAngle) * sideOffset + Math.sin(this.myShip.rotation - skewAngle) * 4;
+          const rightX = sternX - Math.cos(perpAngle) * sideOffset + Math.cos(this.myShip.rotation + skewAngle) * 4;
+          const rightY = sternY - Math.sin(perpAngle) * sideOffset + Math.sin(this.myShip.rotation + skewAngle) * 4;
+
+          const leftTrail = new Sprite(this.particleTexture);
+          leftTrail.width = 5;
+          leftTrail.height = 5;
+          leftTrail.anchor.set(0.5);
+          leftTrail.tint = 0xffffff;
+          leftTrail.alpha = 0.85;
+          leftTrail.x = leftX;
+          leftTrail.y = leftY;
+          leftTrail.zIndex = 2;
+          this.worldContainer.addChild(leftTrail);
+          this.trails.push({ sprite: leftTrail, life: 1.0, maxLife: 1.0 });
+
+          const rightTrail = new Sprite(this.particleTexture);
+          rightTrail.width = 5;
+          rightTrail.height = 5;
+          rightTrail.anchor.set(0.5);
+          rightTrail.tint = 0xffffff;
+          rightTrail.alpha = 0.85;
+          rightTrail.x = rightX;
+          rightTrail.y = rightY;
+          rightTrail.zIndex = 2;
+          this.worldContainer.addChild(rightTrail);
+          this.trails.push({ sprite: rightTrail, life: 1.0, maxLife: 1.0 });
+        }
+
+        // --- COLISÃO RIGOROSA COM AS BORDAS DO MAPA ---
+        const margin = 30; 
+        const rightBoundary = this.mapMaxX;
+
+        if (this.myShip.x < this.mapMinX + margin || 
+            this.myShip.x > rightBoundary - margin || 
+            this.myShip.y < this.mapMinY + margin || 
+            this.myShip.y > this.mapMaxY - margin) {
           this.myShip.x = prevX;
           this.myShip.y = prevY;
           this.myShip.speed = -this.myShip.speed * 0.5; 
@@ -225,13 +298,25 @@ export class GameScene {
           }
         }
 
-        // Projéteis
+        // --- PROJÉTEIS E RASTROS DE BALA ---
         for (let i = this.cannonBalls.length - 1; i >= 0; i--) {
           const ball = this.cannonBalls[i];
           const step = 12 * delta; 
           ball.sprite.x += ball.vx * step;
           ball.sprite.y += ball.vy * step;
           ball.distanceTraveled += step;
+
+          const ballTrail = new Sprite(this.particleTexture);
+          ballTrail.width = 5;
+          ballTrail.height = 5;
+          ballTrail.anchor.set(0.5);
+          ballTrail.tint = 0xffffff;
+          ballTrail.alpha = 0.7;
+          ballTrail.x = ball.sprite.x;
+          ballTrail.y = ball.sprite.y;
+          ballTrail.zIndex = 6;
+          this.worldContainer.addChild(ballTrail);
+          this.trails.push({ sprite: ballTrail, life: 0.5, maxLife: 0.5 });
 
           let projectileDestroyed = false;
 
@@ -244,6 +329,7 @@ export class GameScene {
 
               if (distToEnemy < 35) {
                 enemyData.hp -= 25;
+                (enemyData as any).hitFlashTimer = 20; 
                 CombatManager.createExplosion(this.worldContainer, ball.sprite.x, ball.sprite.y);
                 this.playSound('ship_wood_hit_1.wav');
 
@@ -262,9 +348,7 @@ export class GameScene {
                   
                   this.score += 1;
                   useGameStore.getState().setScore(this.score);
-
                   this.playSound('score_point.wav');
-                  if (this.scoreText) this.scoreText.text = `${this.score}`;
                 }
                 break;
               }
@@ -275,9 +359,12 @@ export class GameScene {
             const distToPlayer = Math.sqrt(dx * dx + dy * dy);
 
             if (distToPlayer < 30) {
-              
               this.playerHp = Math.max(0, this.playerHp - 15);
               useGameStore.getState().setPlayerHp(this.playerHp);
+              
+              this.playerHitFlashTimer = 30;
+              this.cameraShakeTimer = 35;
+
               CombatManager.createExplosion(this.worldContainer, ball.sprite.x, ball.sprite.y);
               this.playSound('ship_wood_hit_2.wav');
 
@@ -318,7 +405,21 @@ export class GameScene {
           }
         }
         
-        // Inimigos AI
+        // --- ATUALIZAÇÃO DOS RASTROS ---
+        for (let t = this.trails.length - 1; t >= 0; t--) {
+          const tr = this.trails[t];
+          tr.life -= delta * 0.04;
+          if (tr.life <= 0) {
+            this.worldContainer.removeChild(tr.sprite);
+            tr.sprite.destroy();
+            this.trails.splice(t, 1);
+          } else {
+            tr.sprite.alpha = (tr.life / tr.maxLife) * 0.7;
+            tr.sprite.scale.set(1 + (1 - tr.life / tr.maxLife) * 0.8);
+          }
+        }
+
+        // --- INIMIGOS AI E TIER/DANOS ---
         for (let j = this.enemies.length - 1; j >= 0; j--) {
           const enemyData = this.enemies[j];
           const enemy = enemyData.ship;
@@ -328,15 +429,36 @@ export class GameScene {
 
           const prevEnemyX = enemy.x;
           const prevEnemyY = enemy.y;
-
           let targetSpeed = 1.5;
+
+          const enemyHpPct = enemyData.hp / enemyData.maxHp;
+          const desiredEnemyTier: DamageLevel = enemyHpPct < 0.3 ? 2 : enemyHpPct < 0.75 ? 1 : 0;
+          const enemyExtended = enemyData as any;
+          if (enemyExtended.currentTier !== desiredEnemyTier) {
+            enemyExtended.currentTier = desiredEnemyTier;
+            enemy.setDamage(desiredEnemyTier);
+          }
+
+          if (enemyExtended.hitFlashTimer && enemyExtended.hitFlashTimer > 0) {
+            enemyExtended.hitFlashTimer -= delta;
+            enemy.tint = 0xff2222;
+          } else {
+            enemy.tint = 0xffffff;
+          }
 
           enemyData.healthContainer.x = enemy.x;
           enemyData.healthContainer.y = enemy.y - 40;
 
           const hpPercentage = Math.max(0, enemyData.hp / enemyData.maxHp);
           enemyData.healthBarFill.width = enemyData.maxInternalWidth * hpPercentage;
-          enemyData.healthBarFill.texture = Texture.from(hpPercentage < 0.3 ? 'enemy_health_fill_red' : 'enemy_health_fill_green');
+          
+          if (hpPercentage >= 0.75) {
+            enemyData.healthBarFill.tint = 0x2ecc71;
+          } else if (hpPercentage >= 0.3) {
+            enemyData.healthBarFill.tint = 0xf1c40f;
+          } else {
+            enemyData.healthBarFill.tint = 0xe74c3c;
+          }
 
           const mapGridWidth = this.radiusInTiles * 2 + 1;
           const checkIsLand = (px: number, py: number) => {
@@ -350,7 +472,6 @@ export class GameScene {
             return false;
           };
 
-          // Sensores de desvio um pouco mais distantes para antecipar a curva
           const lookAheadDist = 90;
           const sideOffsetAngle = 0.5;
           const aheadX = enemy.x + Math.cos(enemy.rotation) * lookAheadDist;
@@ -364,39 +485,32 @@ export class GameScene {
           const hitLeft = checkIsLand(leftAheadX, leftAheadY);
           const hitRight = checkIsLand(rightAheadX, rightAheadY);
 
-          // Se ainda está no tempo de fuga/desvio
           if (enemyData.escapeTimer > 0) {
             enemyData.escapeTimer -= delta;
             enemyData.state = 'escaping';
-            
-            // Mantém firmemente a direção de desvio escolhida (sem recalcular a cada frame)
             const turnDir = enemyData.avoidanceDirection || 1;
             enemy.rotation += 0.08 * turnDir * delta; 
             targetSpeed = 1.6;
           } 
           else if (hitCenter || hitLeft || hitRight) {
-            // Acabou de detetar a ilha: inicia o desvio com tempo fixo para garantir estabilidade
-            enemyData.escapeTimer = 50; // Tempo maior de curva para contornar limpo
+            enemyData.escapeTimer = 50;
             enemyData.state = 'escaping';
-
-            // Define a direção fixa com base em qual lado bateu (evita indecisão)
             if (hitLeft && !hitRight) {
-              enemyData.avoidanceDirection = 1;  // Força curva para a direita
+              enemyData.avoidanceDirection = 1;
             } else if (hitRight && !hitLeft) {
-              enemyData.avoidanceDirection = -1; // Força curva para a esquerda
+              enemyData.avoidanceDirection = -1;
             } else {
               enemyData.avoidanceDirection = Math.random() > 0.5 ? 1 : -1;
             }
           } 
           else {
-            // --- MOVIMENTO NORMAL (SEM OBSTÁCULOS PRÓXIMOS) ---
             if (enemyData.type === 'kamikaze') {
-              
               if (distToPlayer <= 45) {
-                
                 this.playerHp = Math.max(0, this.playerHp - 25);
-
                 useGameStore.getState().setPlayerHp(this.playerHp);
+                this.playerHitFlashTimer = 35;
+                this.cameraShakeTimer = 40;
+
                 CombatManager.createExplosion(this.worldContainer, enemy.x, enemy.y);
                 this.playSound('ship_explosion_1.wav', 0.8);
 
@@ -413,7 +527,7 @@ export class GameScene {
                 let angleDiff = Math.atan2(dy, dx) - enemy.rotation;
                 while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
                 while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-                enemy.rotation += angleDiff * 0.25 * delta; // Rotação mais suave rumo ao player
+                enemy.rotation += angleDiff * 0.25 * delta;
                 targetSpeed = 3.0; 
               } else {
                 enemyData.state = 'wandering';
@@ -430,7 +544,7 @@ export class GameScene {
                 let angleDiff = targetAngle - enemy.rotation;
                 while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
                 while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-                enemy.rotation += angleDiff * 0.15 * delta; // Suavizado para evitar guinadas bruscas
+                enemy.rotation += angleDiff * 0.15 * delta;
 
                 if (distToPlayer > 280) {
                   enemyData.state = 'chasing';
@@ -465,7 +579,6 @@ export class GameScene {
           enemy.speed += (targetSpeed - enemy.speed) * 0.08 * delta;
           enemy.update(delta);         
 
-          // Salvaguarda caso encoste na terra
           const enemyTileX = Math.floor(enemy.x / this.tileSize);
           const enemyTileY = Math.floor(enemy.y / this.tileSize);
           const eGridX = enemyTileX - this.mapOriginTileX;
@@ -476,13 +589,14 @@ export class GameScene {
               enemy.x = prevEnemyX;
               enemy.y = prevEnemyY;
               enemy.speed = 0;
-              enemy.rotation += 0.3; // Força um pequeno giro para escapar se tocar na borda
+              enemy.rotation += 0.3;
             }
           }
 
           this.worldContainer.sortChildren();
         }
 
+        // --- CÂMARA E CORREÇÃO FINAL DA BORDA PRETA ---
         const stageScaleX = this.app.stage.scale.x;
         const stageScaleY = this.app.stage.scale.y;
         const currentCenterX = (this.app.renderer.width / stageScaleX) / 2;
@@ -493,19 +607,24 @@ export class GameScene {
         const screenWidth = this.app.renderer.width / stageScaleX;
         const screenHeight = this.app.renderer.height / stageScaleY;
 
-        targetX = Math.min(-this.mapMinX, Math.max(screenWidth - this.mapMaxX, targetX));
-        targetY = Math.min(-this.mapMinY, Math.max(screenHeight - this.mapMaxY, targetY));
+        const minCameraX = screenWidth - this.mapMaxX; 
+        const maxCameraX = 0;
+        const minCameraY = screenHeight - this.mapMaxY;
+        const maxCameraY = 0;
 
-        this.worldContainer.x += (targetX - this.worldContainer.x) * 0.1;
-        this.worldContainer.y += (targetY - this.worldContainer.y) * 0.1;
+        targetX = Math.min(maxCameraX, Math.max(minCameraX, targetX));
+        targetY = Math.min(maxCameraY, Math.max(minCameraY, targetY));
 
-        const pPct = Math.max(0, this.playerHp / this.playerMaxHp);
-        if (this.playerHealthText) this.playerHealthText.text = `${Math.round(this.playerHp)} / ${this.playerMaxHp}`;
-        if (this.playerHealthMask) {
-          this.playerHealthMask.clear();
-          this.playerHealthMask.rect(80 - (this.playerMaxInternalWidth / 2), 15 - (this.playerHealthBarFill.height / 2), this.playerMaxInternalWidth * pPct, this.playerHealthBarFill.height);
-          this.playerHealthMask.fill(0xffffff);
+        let shakeOffsetX = 0;
+        let shakeOffsetY = 0;
+        if (this.cameraShakeTimer > 0) {
+          this.cameraShakeTimer -= delta;
+          shakeOffsetX = (Math.random() - 0.5) * 40;
+          shakeOffsetY = (Math.random() - 0.5) * 40;
         }
+
+        this.worldContainer.x += ((targetX + shakeOffsetX) - this.worldContainer.x) * 0.2;
+        this.worldContainer.y += ((targetY + shakeOffsetY) - this.worldContainer.y) * 0.2;
       });
 
     } catch (e) {
@@ -515,9 +634,8 @@ export class GameScene {
 
   private fireCannon() {
     if (!this.isAssetsLoaded) return;
-
     const currentTime = Date.now();
-    if (currentTime - this.lastShotTime < this.shootCooldown) return; // Impede o tiro se estiver no cooldown
+    if (currentTime - this.lastShotTime < this.shootCooldown) return;
     this.lastShotTime = currentTime;
 
     const fireSounds = ['cannon_fire_1.wav', 'cannon_fire_2.wav', 'cannon_fire_3.wav'];
@@ -529,9 +647,8 @@ export class GameScene {
 
   private firePlayerBroadside(side: 'left' | 'right') {
     if (!this.isAssetsLoaded) return;
-
     const currentTime = Date.now();
-    if (currentTime - this.lastShotTime < this.shootCooldown) return; // Impede o broadside se estiver no cooldown
+    if (currentTime - this.lastShotTime < this.shootCooldown) return;
     this.lastShotTime = currentTime;
 
     this.playSound('cannon_broadside.wav', 0.7);
@@ -559,7 +676,6 @@ export class GameScene {
     }
   }
 
-  // Novo controle direcional livre (o ângulo vem direto do joystick virtual)
   public setMobileJoystick(angle: number | null, isMoving: boolean) {
     this.isMobileMoving = isMoving;
     this.mobileInputAngle = angle;
@@ -586,11 +702,6 @@ export class GameScene {
 
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.isPaused && e.code !== 'Escape') return;
-    
-    // Removemos o bloqueio 'if (this.keysPressed[e.code]) return' apenas para teclas de tiro 
-    // se quisermos gerir pelo cooldown de tempo, mas mantemos para evitar spam contínuo 
-    // ou deixamos o cooldown tratar disso. O cooldown por tempo já resolve perfeitamente!
-    
     if (this.keysPressed[e.code]) return; 
     this.keysPressed[e.code] = true;
 
@@ -607,6 +718,9 @@ export class GameScene {
   public destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    if (this.particleTexture) {
+      this.particleTexture.destroy(true);
+    }
     this.worldContainer.destroy({ children: true });
   }
 }
